@@ -1,510 +1,74 @@
-const STORAGE_KEY = 'crestie-lineage-v1';
+const STORAGE_KEY='crestie-lineage-v1';
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const uid=()=>`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+const today=()=>new Date().toISOString().slice(0,10);
+const esc=(v='')=>String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const pct=n=>`${(n*100).toFixed(n*100<10?1:0).replace('.0','')}%`;
+let currentView='dashboard', growthSelectedGecko='', pedigreeSelectedId='', pedigreeScale=1;
+const state=loadState(); growthSelectedGecko=state.geckos[0]?.id||'';
 
-const state = loadState();
-let currentView = 'dashboard';
-let growthSelectedGecko = state.geckos[0]?.id || '';
-let pedigreeSelectedId = '';
-let pedigreeScale = 1;
+function normalizeGecko(g={}){return{...g,id:g.id||uid(),name:g.name||'',morph:g.morph||'',sex:['male','female','unknown'].includes(g.sex)?g.sex:'unknown',hatchDate:g.hatchDate||'',acquiredDate:g.acquiredDate||'',breeder:g.breeder||'',notes:g.notes||'',parent1Id:g.parent1Id||'',parent2Id:g.parent2Id||'',breederNotation:g.breederNotation||'',customTraits:Array.isArray(g.customTraits)?g.customTraits:[],genetics:{lilly:g.genetics?.lilly||'unknown',axanthic:g.genetics?.axanthic||'unknown',cappuccino:g.genetics?.cappuccino||'unknown',solidBack:g.genetics?.solidBack||'unknown'}}}
+function loadState(){try{const p=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');return{geckos:Array.isArray(p.geckos)?p.geckos.map(normalizeGecko):[],growth:Array.isArray(p.growth)?p.growth:[],pairings:Array.isArray(p.pairings)?p.pairings:[]}}catch{return{geckos:[],growth:[],pairings:[]}}}
+function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+function getGecko(id){return state.geckos.find(g=>g.id===id)}
+function geckoName(id){return getGecko(id)?.name||'미등록'}
+function sexLabel(s){return({male:'수컷',female:'암컷',unknown:'미확인'})[s]||'미확인'}
+function sexBadge(s){return `<span class="badge ${s}">${sexLabel(s)}</span>`}
+function statusLabel(s){return({planned:'계획',paired:'교배 진행',eggs:'산란 / 알',hatched:'부화 확인',closed:'종료'})[s]||s}
+function splitTraits(v){return v.split(',').map(x=>x.trim()).filter(Boolean)}
+function fmtDate(v){return v||'-'}
+function ageText(d){if(!d)return'-';const a=new Date(d+'T00:00:00'),n=new Date();let m=(n.getFullYear()-a.getFullYear())*12+n.getMonth()-a.getMonth()-(n.getDate()<a.getDate()?1:0);if(m<0)return'-';return m<12?`${m}개월`:`${Math.floor(m/12)}년 ${m%12}개월`}
+function latestGrowth(id){return state.growth.filter(r=>r.geckoId===id).sort((a,b)=>b.date.localeCompare(a.date))[0]}
+function isAncestor(a,n,seen=new Set()){if(!a||!n||seen.has(n))return false;seen.add(n);const g=getGecko(n);if(!g)return false;const ps=[g.parent1Id,g.parent2Id].filter(Boolean);return ps.includes(a)||ps.some(p=>isAncestor(a,p,seen))}
+function ancestorsOf(id,out=new Set()){const g=getGecko(id);if(!g)return out;[g.parent1Id,g.parent2Id].filter(Boolean).forEach(p=>{if(!out.has(p)){out.add(p);ancestorsOf(p,out)}});return out}
+function relationOf(a,b){if(!a||!b)return'두 개체를 선택하세요.';if(a===b)return'같은 개체';const A=getGecko(a),B=getGecko(b);if([A?.parent1Id,A?.parent2Id].includes(b)||[B?.parent1Id,B?.parent2Id].includes(a))return'직계 부모 · 자식';const ap=[A?.parent1Id,A?.parent2Id].filter(Boolean),bp=[B?.parent1Id,B?.parent2Id].filter(Boolean);if(ap.some(x=>bp.includes(x)))return'형제 · 자매';const aa=ancestorsOf(a),bb=ancestorsOf(b);if(aa.has(b)||bb.has(a))return'직계 조상 · 후손';if([...aa].some(x=>bb.has(x)))return'공통 조상이 있는 혈연';return'확인된 공통 조상 없음'}
 
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => [...document.querySelectorAll(sel)];
-const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-const today = () => new Date().toISOString().slice(0, 10);
-const esc = (value='') => String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const viewMeta={dashboard:['대시보드','크레스티드 게코의 성장과 혈통을 한곳에서 관리합니다.'],geckos:['개체 관리','기본 정보와 유전 정보를 관리합니다.'],growth:['성장 기록','날짜별 체중과 전장 변화를 기록합니다.'],pedigree:['교배 · 가계도','부모 관계를 기준으로 자동 배치합니다.'],genetics:['유전 · 교배 예상','두 마리를 선택해 예상 자손을 계산합니다.'],backup:['백업 · 복원','JSON으로 저장하고 불러옵니다.']};
+function setView(v){currentView=v;$$('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===v));$$('.view').forEach(x=>x.classList.toggle('active',x.id===`view-${v}`));$('#viewTitle').textContent=viewMeta[v][0];$('#viewSubtitle').textContent=viewMeta[v][1];renderCurrent()}
+function renderCurrent(){({dashboard:renderDashboard,geckos:renderGeckos,growth:renderGrowth,pedigree:renderPedigree,genetics:renderGenetics,backup:renderBackup})[currentView]?.()}
+function renderAll(){saveState();renderCurrent()}
+function emptyHtml(a,b=''){return `<div class="empty"><b>${a}</b><span>${b}</span></div>`}
 
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { geckos: [], growth: [], pairings: [] };
-    const parsed = JSON.parse(raw);
-    return {
-      geckos: Array.isArray(parsed.geckos) ? parsed.geckos : [],
-      growth: Array.isArray(parsed.growth) ? parsed.growth : [],
-      pairings: Array.isArray(parsed.pairings) ? parsed.pairings : []
-    };
-  } catch {
-    return { geckos: [], growth: [], pairings: [] };
-  }
-}
+function renderDashboard(){const latest=[...state.growth].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);$('#view-dashboard').innerHTML=`<div class="grid cols-4"><div class="card stat-card"><div class="stat-label">등록 개체</div><div class="stat-value">${state.geckos.length}</div><div class="stat-sub">전체 개체</div></div><div class="card stat-card"><div class="stat-label">성별 미확인</div><div class="stat-value">${state.geckos.filter(g=>g.sex==='unknown').length}</div><div class="stat-sub">양쪽 성별 교배 후보</div></div><div class="card stat-card"><div class="stat-label">성장 기록</div><div class="stat-value">${state.growth.length}</div><div class="stat-sub">누적 측정</div></div><div class="card stat-card"><div class="stat-label">교배 기록</div><div class="stat-value">${state.pairings.length}</div><div class="stat-sub">계획 포함</div></div></div><div class="grid cols-2" style="margin-top:18px"><div class="card pad"><div class="section-head"><div><h2>최근 성장 기록</h2></div></div>${latest.length?`<div class="list">${latest.map(r=>`<div class="list-item"><div class="list-main"><b>${esc(geckoName(r.geckoId))}</b><span>${r.date}</span></div><span class="badge">${r.weight!==''?r.weight+' g':'-'}</span></div>`).join('')}</div>`:emptyHtml('아직 기록이 없습니다.')}</div><div class="card pad"><div class="section-head"><div><h2>빠른 이동</h2><p>유전 계산은 두 개체만 선택해서 확인합니다.</p></div></div><div class="toolbar"><button class="btn primary" data-go="genetics">유전 · 교배 예상</button><button class="btn secondary" data-go="pedigree">가계도 보기</button></div></div></div>`;$$('[data-go]').forEach(b=>b.onclick=()=>setView(b.dataset.go))}
 
-function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
+function comboAliasesForGecko(g){const d=geneProfile(g),out=[];if(d.lilly===1&&d.axanthic===2)out.push('릴리아잔틱','릴잔틱','릴리 아잔틱','Lilly White Axanthic');if(d.lilly===1&&g.genetics.solidBack==='present')out.push('솔리드릴리','솔리드 릴리','솔리드백 릴리','솔리드백 릴리화이트','Solid Lilly');if(d.lilly===1&&d.cappuccino===1)out.push('프라푸치노','Frappuccino');if(!out.length){if(d.lilly===1)out.push('릴리화이트','릴리','Lilly White');if(d.axanthic===2)out.push('아잔틱','Axanthic');if(d.cappuccino===1)out.push('카푸치노','Cappuccino');if(g.genetics.solidBack==='present')out.push('솔리드백','Solid Back')}return [...new Set(out)]}
+function geneProfile(g){return{lilly:explicitCopies(g,'lilly'),axanthic:explicitCopies(g,'axanthic'),cappuccino:explicitCopies(g,'cappuccino')}}
+function explicitCopies(g,gene){const v=g?.genetics?.[gene];if(gene==='axanthic')return v==='visual'?2:v==='het100'?1:v==='clear'?0:null;return v==='super'?2:(v==='lilly'||v==='cappuccino')?1:v==='normal'?0:null}
+function geneticAssessment(g){const certain=[],possible=[];const add=(name,dist)=>{const ks=Object.entries(dist).filter(([,p])=>p>0);if(ks.length===1){const [k]=ks[0];certain.push(labelGeneState(name,+k))}else ks.forEach(([k,p])=>possible.push(`${labelGeneState(name,+k)} ${pct(p)}`))};['lilly','axanthic','cappuccino'].forEach(x=>add(x,geneDist(g,x)));if(g.genetics.solidBack==='present')certain.push('솔리드백');else if(g.genetics.solidBack==='unknown')possible.push('솔리드백 여부 미확인');return{certain,possible}}
+function labelGeneState(g,c){if(g==='lilly')return c===2?'슈퍼 릴리':c===1?'릴리화이트':'릴리 유전자 없음';if(g==='axanthic')return c===2?'비주얼 아잔틱':c===1?'헷 아잔틱':'아잔틱 유전자 없음';return c===2?'슈퍼 카푸치노':c===1?'카푸치노':'카푸치노 유전자 없음'}
 
-function getGecko(id) { return state.geckos.find(g => g.id === id); }
-function geckoName(id) { return getGecko(id)?.name || '미등록'; }
-function sexLabel(sex) { return ({male:'수컷', female:'암컷', unknown:'미확인'})[sex] || '미확인'; }
-function statusLabel(status) { return ({planned:'계획', paired:'교배 진행', eggs:'산란 / 알', hatched:'부화 확인', closed:'종료'})[status] || status; }
-function sexBadge(sex) { return `<span class="badge ${sex}">${sexLabel(sex)}</span>`; }
-function fmtDate(value) { return value || '-'; }
+function renderGeckos(){const rows=state.geckos.map(g=>{const a=geneticAssessment(g),aliases=comboAliasesForGecko(g);return `<tr><td class="name-cell"><b>${esc(g.name)}</b><span>${esc(g.morph||'모프 미입력')}</span></td><td class="name-cell"><b>${esc(aliases[0]||a.certain.slice(0,2).join(' · ')||'-')}</b><span>${esc(aliases.slice(1).join(' / ')||a.possible.slice(0,2).join(' · ')||'')}</span></td><td>${sexBadge(g.sex)}</td><td>${latestGrowth(g.id)?.weight??'-'}${latestGrowth(g.id)?.weight!=null?' g':''}</td><td>${esc(geckoName(g.parent1Id))}</td><td>${esc(geckoName(g.parent2Id))}</td><td><div class="actions"><button class="btn secondary small" data-edit="${g.id}">수정</button><button class="btn ghost small" data-growth="${g.id}">성장</button><button class="btn ghost small" data-del="${g.id}">삭제</button></div></td></tr>`}).join('');$('#view-geckos').innerHTML=`<div class="card"><div class="section-head" style="padding:18px 18px 0"><div><h2>개체 목록</h2><p>부모·유전 정보를 수정하면 계산 결과도 갱신됩니다.</p></div><button class="btn primary" id="addGeckoInView">+ 개체 등록</button></div>${rows?`<div class="table-wrap"><table><thead><tr><th>개체</th><th>유전 / 통용 표기</th><th>성별</th><th>최근 체중</th><th>부모 1</th><th>부모 2</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyHtml('등록된 개체가 없습니다.')}</div>`;$('#addGeckoInView').onclick=()=>openGeckoDialog();$$('[data-edit]').forEach(b=>b.onclick=()=>openGeckoDialog(b.dataset.edit));$$('[data-growth]').forEach(b=>b.onclick=()=>{growthSelectedGecko=b.dataset.growth;setView('growth')});$$('[data-del]').forEach(b=>b.onclick=()=>deleteGecko(b.dataset.del))}
+function fillGeckoSelect(el,{includeBlank=false,excludeId=''}={}){el.innerHTML=(includeBlank?'<option value="">없음 / 미등록</option>':'')+state.geckos.filter(g=>g.id!==excludeId).map(g=>`<option value="${g.id}">${esc(g.name)} · ${sexLabel(g.sex)}</option>`).join('')}
+function openGeckoDialog(id=''){const g=id?getGecko(id):null;$('#geckoDialogTitle').textContent=g?'개체 정보 수정':'개체 등록';$('#geckoId').value=g?.id||'';$('#geckoName').value=g?.name||'';$('#geckoMorph').value=g?.morph||'';$('#geckoSex').value=g?.sex||'unknown';$('#geckoHatchDate').value=g?.hatchDate||'';$('#geckoAcquiredDate').value=g?.acquiredDate||'';$('#geckoBreeder').value=g?.breeder||'';$('#geckoNotes').value=g?.notes||'';$('#geckoNotation').value=g?.breederNotation||'';$('#geckoTraits').value=(g?.customTraits||[]).join(', ');$('#geneLilly').value=g?.genetics?.lilly||'unknown';$('#geneAxanthic').value=g?.genetics?.axanthic||'unknown';$('#geneCappuccino').value=g?.genetics?.cappuccino||'unknown';$('#traitSolidBack').value=g?.genetics?.solidBack||'unknown';fillGeckoSelect($('#geckoParent1'),{includeBlank:true,excludeId:id});fillGeckoSelect($('#geckoParent2'),{includeBlank:true,excludeId:id});$('#geckoParent1').value=g?.parent1Id||'';$('#geckoParent2').value=g?.parent2Id||'';$('#notationHint').textContent='';$('#geckoFormError').classList.add('hidden');$('#geckoDialog').showModal()}
+function analyzeNotation(){const t=($('#geckoNotation').value+' '+$('#geckoMorph').value).toLowerCase().replace(/\s/g,'');let found=[];if(/릴잔틱|릴리아잔틱|lillywhiteaxanthic/.test(t)){ $('#geneLilly').value='lilly';$('#geneAxanthic').value='visual';found.push('릴리화이트 + 비주얼 아잔틱') }else if(/릴리|lillywhite/.test(t)){ $('#geneLilly').value='lilly';found.push('릴리화이트') }if(/100%?헷아잔틱|100hetaxanthic/.test(t)){ $('#geneAxanthic').value='het100';found.push('100% 헷 아잔틱') }else if(/66%?헷아잔틱/.test(t)){ $('#geneAxanthic').value='het66';found.push('66% 헷 아잔틱') }else if(/50%?헷아잔틱/.test(t)){ $('#geneAxanthic').value='het50';found.push('50% 헷 아잔틱') }else if(/아잔틱|axanthic/.test(t)&&$('#geneAxanthic').value==='unknown'){ $('#geneAxanthic').value='visual';found.push('비주얼 아잔틱') }if(/솔리드릴리|솔리드백|solidback|solidlilly/.test(t)){ $('#traitSolidBack').value='present';found.push('솔리드백') }if(/카푸치노|cappuccino/.test(t)){ $('#geneCappuccino').value='cappuccino';found.push('카푸치노') }const raw=$('#geckoNotation').value;const m=raw.match(/\(([^()]+)[\/×xX]([^()]+)\)/);if(m){const names=[m[1].trim(),m[2].trim()];const ids=names.map(n=>state.geckos.find(g=>g.name.trim()===n)?.id||'');if(ids[0]&&ids[1]){$('#geckoParent1').value=ids[0];$('#geckoParent2').value=ids[1];found.push(`부모 ${names[0]} / ${names[1]} 연결`)}}$('#notationHint').innerHTML=found.length?`인식: <b>${esc(found.join(' · '))}</b>`:'자동으로 확정할 수 있는 유전 표기를 찾지 못했습니다. 원문 표기는 그대로 저장됩니다.'}
+function saveGecko(){const id=$('#geckoId').value,name=$('#geckoName').value.trim(),p1=$('#geckoParent1').value,p2=$('#geckoParent2').value,err=$('#geckoFormError');if(!name){err.textContent='이름을 입력하세요.';err.classList.remove('hidden');return}if(p1&&p1===p2){err.textContent='부모 두 칸에는 다른 개체를 선택하세요.';err.classList.remove('hidden');return}if(id&&((p1&&isAncestor(id,p1))||(p2&&isAncestor(id,p2)))){err.textContent='자기 자신이 자신의 조상이 되는 순환 가계도만 만들 수 없습니다.';err.classList.remove('hidden');return}const d=normalizeGecko({id:id||uid(),name,morph:$('#geckoMorph').value.trim(),sex:$('#geckoSex').value,hatchDate:$('#geckoHatchDate').value,acquiredDate:$('#geckoAcquiredDate').value,breeder:$('#geckoBreeder').value.trim(),notes:$('#geckoNotes').value.trim(),parent1Id:p1,parent2Id:p2,breederNotation:$('#geckoNotation').value.trim(),customTraits:splitTraits($('#geckoTraits').value),genetics:{lilly:$('#geneLilly').value,axanthic:$('#geneAxanthic').value,cappuccino:$('#geneCappuccino').value,solidBack:$('#traitSolidBack').value}});if(id)Object.assign(getGecko(id),d);else state.geckos.push(d);saveState();$('#geckoDialog').close();renderCurrent()}
+function deleteGecko(id){if(!confirm(`“${geckoName(id)}”를 삭제할까요?`))return;state.geckos=state.geckos.filter(g=>g.id!==id);state.growth=state.growth.filter(r=>r.geckoId!==id);state.pairings=state.pairings.filter(p=>p.aId!==id&&p.bId!==id);state.geckos.forEach(g=>{if(g.parent1Id===id)g.parent1Id='';if(g.parent2Id===id)g.parent2Id=''});saveState();renderCurrent()}
 
-function ageText(date) {
-  if (!date) return '-';
-  const start = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(start.getTime())) return '-';
-  const now = new Date();
-  let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-  if (now.getDate() < start.getDate()) months--;
-  if (months < 0) return '-';
-  if (months < 12) return `${months}개월`;
-  return `${Math.floor(months/12)}년 ${months%12}개월`;
-}
+function renderGrowth(){if(!growthSelectedGecko||!getGecko(growthSelectedGecko))growthSelectedGecko=state.geckos[0]?.id||'';const rows=state.growth.filter(r=>r.geckoId===growthSelectedGecko).sort((a,b)=>a.date.localeCompare(b.date));$('#view-growth').innerHTML=`<div class="card pad"><div class="section-head"><div><h2>성장 기록</h2></div><button class="btn primary" id="addGrowthInView" ${state.geckos.length?'':'disabled'}>+ 기록</button></div>${state.geckos.length?`<label>개체<select id="growthFocus">${state.geckos.map(g=>`<option value="${g.id}" ${g.id===growthSelectedGecko?'selected':''}>${esc(g.name)}</option>`).join('')}</select></label><div id="growthChart" class="chart-box" style="margin-top:18px">${growthChartSvg(rows)}</div>`:emptyHtml('먼저 개체를 등록하세요.')}</div><div class="card" style="margin-top:18px">${rows.length?`<div class="table-wrap"><table><thead><tr><th>날짜</th><th>체중</th><th>전장</th><th>상태</th><th>메모</th><th></th></tr></thead><tbody>${[...rows].reverse().map(r=>`<tr><td>${r.date}</td><td>${r.weight!==''?r.weight+' g':'-'}</td><td>${r.length!==''?r.length+' cm':'-'}</td><td>${esc(r.condition||'-')}</td><td>${esc(r.note||'-')}</td><td><button class="btn ghost small" data-rdel="${r.id}">삭제</button></td></tr>`).join('')}</tbody></table></div>`:emptyHtml('성장 기록이 없습니다.')}</div>`;if($('#growthFocus'))$('#growthFocus').onchange=e=>{growthSelectedGecko=e.target.value;renderGrowth()};if($('#addGrowthInView'))$('#addGrowthInView').onclick=()=>openGrowthDialog('',growthSelectedGecko);$$('[data-rdel]').forEach(b=>b.onclick=()=>{if(confirm('삭제할까요?')){state.growth=state.growth.filter(r=>r.id!==b.dataset.rdel);renderAll()}})}
+function growthChartSvg(rows){const pts=rows.filter(r=>r.weight!==''&&r.weight!=null);if(pts.length<2)return emptyHtml('그래프 데이터가 부족합니다.','체중 기록이 2개 이상이면 선 그래프가 표시됩니다.');const W=800,H=260,P=40,vals=pts.map(x=>+x.weight),min=Math.min(...vals),max=Math.max(...vals),rng=max-min||1,x=i=>P+i*(W-2*P)/(pts.length-1),y=v=>H-P-(v-min)*(H-2*P)/rng,path=pts.map((r,i)=>`${i?'L':'M'} ${x(i)} ${y(r.weight)}`).join(' ');return `<svg class="chart-svg" viewBox="0 0 ${W} ${H}"><path class="chart-line" d="${path}"/>${pts.map((r,i)=>`<circle class="chart-dot" cx="${x(i)}" cy="${y(r.weight)}" r="4"><title>${r.date}: ${r.weight}g</title></circle>`).join('')}</svg>`}
+function openGrowthDialog(id='',gid=''){if(!state.geckos.length)return alert('먼저 개체를 등록하세요.');const r=id?state.growth.find(x=>x.id===id):null;fillGeckoSelect($('#growthGecko'));$('#growthId').value=r?.id||'';$('#growthGecko').value=r?.geckoId||gid||growthSelectedGecko||state.geckos[0].id;$('#growthDate').value=r?.date||today();$('#growthWeight').value=r?.weight??'';$('#growthLength').value=r?.length??'';$('#growthCondition').value=r?.condition||'';$('#growthNote').value=r?.note||'';$('#growthDialog').showModal()}
+function saveGrowth(){const gid=$('#growthGecko').value;if(!gid||!$('#growthDate').value)return alert('개체와 날짜를 선택하세요.');const id=$('#growthId').value,d={id:id||uid(),geckoId:gid,date:$('#growthDate').value,weight:$('#growthWeight').value===''?'':+$('#growthWeight').value,length:$('#growthLength').value===''?'':+$('#growthLength').value,condition:$('#growthCondition').value,note:$('#growthNote').value.trim()};if(id)Object.assign(state.growth.find(x=>x.id===id),d);else state.growth.push(d);growthSelectedGecko=gid;saveState();$('#growthDialog').close();setView('growth')}
 
-function latestGrowth(geckoId) {
-  return state.growth
-    .filter(r => r.geckoId === geckoId)
-    .sort((a,b) => b.date.localeCompare(a.date))[0];
-}
+function computeLevels(){const memo=new Map(),vis=new Set();function lv(id){if(memo.has(id))return memo.get(id);if(vis.has(id))return 0;vis.add(id);const g=getGecko(id),ps=[g?.parent1Id,g?.parent2Id].filter(Boolean);const v=ps.length?Math.max(...ps.map(lv))+1:0;vis.delete(id);memo.set(id,v);return v}state.geckos.forEach(g=>lv(g.id));return memo}
+function renderPedigree(){$('#view-pedigree').innerHTML=`<div class="card pad"><div class="section-head"><div><h2>자동 가계도</h2><p>부모를 입력하면 세대별로 자동 재배치됩니다.</p></div><button class="btn primary" id="addPair">+ 교배 관계</button></div><div class="pedigree-wrap"><svg id="pedigreeSvg" class="pedigree-svg"></svg></div></div><div class="card" style="margin-top:18px" id="pairTable"></div>`;drawPedigree();renderPairTable();$('#addPair').onclick=()=>openPairDialog()}
+function drawPedigree(){const svg=$('#pedigreeSvg');if(!state.geckos.length){svg.setAttribute('viewBox','0 0 900 420');svg.innerHTML='<text x="450" y="210" text-anchor="middle" fill="#718096">개체를 등록하면 가계도가 생성됩니다.</text>';return}const levels=computeLevels(),groups={};state.geckos.forEach(g=>(groups[levels.get(g.id)||0]??=[]).push(g));const W=1100,nodeW=170,nodeH=70,gapY=115,pos=new Map();Object.keys(groups).forEach(k=>{const l=+k,arr=groups[k],row=arr.length*nodeW+(arr.length-1)*35,start=(W-row)/2;arr.forEach((g,i)=>pos.set(g.id,{x:start+i*(nodeW+35),y:50+l*(nodeH+gapY)}))});const H=Math.max(420,120+(Math.max(...levels.values())+1)*(nodeH+gapY));const edges=[];state.geckos.forEach(c=>[c.parent1Id,c.parent2Id].filter(p=>pos.has(p)).forEach(pid=>{const a=pos.get(pid),b=pos.get(c.id),x1=a.x+nodeW/2,y1=a.y+nodeH,x2=b.x+nodeW/2,y2=b.y,m=(y1+y2)/2;edges.push(`<path class="pedge" d="M${x1} ${y1} C${x1} ${m},${x2} ${m},${x2} ${y2}"/>`)}));const pair=state.pairings.filter(p=>pos.has(p.aId)&&pos.has(p.bId)).map(p=>{const a=pos.get(p.aId),b=pos.get(p.bId);return `<path class="pair-edge" d="M${a.x+nodeW/2} ${a.y+nodeH/2} L${b.x+nodeW/2} ${b.y+nodeH/2}"/>`}).join('');const nodes=state.geckos.map(g=>{const p=pos.get(g.id);return `<g class="pnode" transform="translate(${p.x} ${p.y})"><rect width="${nodeW}" height="${nodeH}"/><text class="name" x="14" y="26">${esc(g.name)}</text><text class="meta" x="14" y="48">${esc(comboAliasesForGecko(g)[0]||g.morph||'모프 미입력')}</text><text class="meta" x="14" y="64">${sexLabel(g.sex)}</text></g>`}).join('');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.innerHTML=edges.join('')+pair+nodes}
+function renderPairTable(){const el=$('#pairTable');el.innerHTML=state.pairings.length?`<div class="table-wrap"><table><thead><tr><th>A</th><th>B</th><th>관계</th><th>상태</th><th></th></tr></thead><tbody>${state.pairings.map(p=>`<tr><td>${esc(geckoName(p.aId))}</td><td>${esc(geckoName(p.bId))}</td><td>${esc(relationOf(p.aId,p.bId))}</td><td>${statusLabel(p.status)}</td><td><button class="btn ghost small" data-pdel="${p.id}">삭제</button></td></tr>`).join('')}</tbody></table></div>`:emptyHtml('등록된 교배 관계가 없습니다.');$$('[data-pdel]').forEach(b=>b.onclick=()=>{state.pairings=state.pairings.filter(p=>p.id!==b.dataset.pdel);renderAll()})}
+function openPairDialog(){if(state.geckos.length<2)return alert('개체가 2마리 이상 필요합니다.');fillGeckoSelect($('#pairA'));fillGeckoSelect($('#pairB'));$('#pairA').value=state.geckos[0].id;$('#pairB').value=state.geckos[1].id;$('#pairId').value='';$('#pairDate').value=today();$('#pairStatus').value='planned';$('#pairNote').value='';updatePairHint();$('#pairA').onchange=updatePairHint;$('#pairB').onchange=updatePairHint;$('#pairDialog').showModal()}
+function updatePairHint(){$('#pairRelationHint').innerHTML=`관계 판정: <b>${esc(relationOf($('#pairA').value,$('#pairB').value))}</b>`}
+function savePair(){const a=$('#pairA').value,b=$('#pairB').value;if(!a||!b||a===b)return alert('서로 다른 두 개체를 선택하세요.');const A=getGecko(a),B=getGecko(b);if(A.sex!=='unknown'&&B.sex!=='unknown'&&A.sex===B.sex&&!confirm('두 개체의 성별이 동일하게 확정되어 있습니다. 그래도 기록할까요?'))return;state.pairings.push({id:uid(),aId:a,bId:b,date:$('#pairDate').value,status:$('#pairStatus').value,note:$('#pairNote').value.trim()});saveState();$('#pairDialog').close();renderPedigree()}
 
-function isAncestor(ancestorId, nodeId, visited = new Set()) {
-  if (!ancestorId || !nodeId || visited.has(nodeId)) return false;
-  visited.add(nodeId);
-  const node = getGecko(nodeId);
-  if (!node) return false;
-  const parents = [node.parent1Id, node.parent2Id].filter(Boolean);
-  if (parents.includes(ancestorId)) return true;
-  return parents.some(p => isAncestor(ancestorId, p, visited));
-}
+function explicitDist(g,gene){const v=g.genetics?.[gene];if(gene==='axanthic'){if(v==='visual')return{2:1};if(v==='het100')return{1:1};if(v==='het66')return{1:.66,0:.34};if(v==='het50')return{1:.5,0:.5};if(v==='clear')return{0:1}}else{if(v==='super')return{2:1};if(v==='lilly'||v==='cappuccino')return{1:1};if(v==='normal')return{0:1}}return null}
+function inferredFromText(g,gene){const t=((g.morph||'')+' '+(g.breederNotation||'')).toLowerCase().replace(/\s/g,'');if(gene==='lilly'&&/릴잔틱|릴리아잔틱|릴리|lillywhite/.test(t))return{1:1};if(gene==='axanthic'){if(/100%?헷아잔틱/.test(t))return{1:1};if(/66%?헷아잔틱/.test(t))return{1:.66,0:.34};if(/50%?헷아잔틱/.test(t))return{1:.5,0:.5};if(/릴잔틱|릴리아잔틱|아잔틱|axanthic/.test(t))return{2:1}}if(gene==='cappuccino'&&/카푸치노|cappuccino|프라푸치노/.test(t))return{1:1};return null}
+function gameteDist(copies){return copies===0?{0:1}:copies===1?{0:.5,1:.5}:{1:1}}
+function crossDist(a,b){const out={0:0,1:0,2:0};Object.entries(a).forEach(([ca,pa])=>Object.entries(b).forEach(([cb,pb])=>{const ga=gameteDist(+ca),gb=gameteDist(+cb);Object.entries(ga).forEach(([xa,qa])=>Object.entries(gb).forEach(([xb,qb])=>out[+xa + +xb]+=pa*pb*qa*qb))}));return Object.fromEntries(Object.entries(out).filter(([,p])=>p>1e-9))}
+function geneDist(g,gene,seen=new Set()){if(!g)return{0:1};const ex=explicitDist(g,gene);if(ex)return ex;const txt=inferredFromText(g,gene);if(txt)return txt;if(seen.has(g.id))return{0:1};seen.add(g.id);const p1=getGecko(g.parent1Id),p2=getGecko(g.parent2Id);if(p1&&p2)return crossDist(geneDist(p1,gene,new Set(seen)),geneDist(p2,gene,new Set(seen)));return{0:1}}
+function offspringDist(A,B,gene){return crossDist(geneDist(A,gene),geneDist(B,gene))}
+function childMorphAliases(l,a,c,solidPossible){const main=[];if(l===2)main.push('슈퍼 릴리');else if(l===1)main.push('릴리화이트');if(a===2)main.push('아잔틱');if(c===2)main.push('슈퍼 카푸치노');else if(c===1)main.push('카푸치노');let aliases=[];if(l===1&&a===2)aliases=['릴리아잔틱','릴잔틱','릴리 아잔틱','Lilly White Axanthic'];else if(l===1&&c===1)aliases=['프라푸치노','Frappuccino'];else if(l===1&&solidPossible)aliases=['솔리드릴리 가능','솔리드 릴리 가능','솔리드백 릴리 가능','Solid Lilly possible'];const genetic=[];if(a===1)genetic.push('100% 헷 아잔틱');return{title:aliases[0]||main.join(' + ')||'노멀/기타 표현형',aliases:aliases.slice(1),genetic}}
+function renderGenetics(){const opts=state.geckos.map(g=>`<option value="${g.id}">${esc(g.name)} · ${sexLabel(g.sex)}</option>`).join('');$('#view-genetics').innerHTML=`<div class="card pad"><div class="section-head"><div><h2>두 개체 교배 예상</h2><p>성별 미확인은 수컷·암컷 어느 쪽으로도 선택할 수 있습니다. 릴리×릴리도 계산은 막지 않고 슈퍼 릴리 가능성을 표시합니다.</p></div></div>${state.geckos.length<2?emptyHtml('개체가 2마리 이상 필요합니다.'):`<div class="form-grid two"><label>개체 A<select id="genA">${opts}</select></label><label>개체 B<select id="genB">${opts}</select></label></div><div id="genResult" style="margin-top:18px"></div>`}</div>`;if(state.geckos.length>=2){$('#genA').value=state.geckos[0].id;$('#genB').value=state.geckos[1].id;$('#genA').onchange=renderGenResult;$('#genB').onchange=renderGenResult;renderGenResult()}}
+function renderGenResult(){const A=getGecko($('#genA').value),B=getGecko($('#genB').value),el=$('#genResult');if(!A||!B||A.id===B.id){el.innerHTML='<div class="notice">서로 다른 두 개체를 선택하세요.</div>';return}const same=A.sex!=='unknown'&&B.sex!=='unknown'&&A.sex===B.sex;const ld=offspringDist(A,B,'lilly'),ad=offspringDist(A,B,'axanthic'),cd=offspringDist(A,B,'cappuccino');const solid=A.genetics.solidBack==='present'||B.genetics.solidBack==='present';const results=[];Object.entries(ld).forEach(([l,pl])=>Object.entries(ad).forEach(([a,pa])=>Object.entries(cd).forEach(([c,pc])=>{const p=pl*pa*pc;if(p<.0001)return;const nm=childMorphAliases(+l,+a,+c,solid);results.push({p,l:+l,a:+a,c:+c,...nm})})));results.sort((x,y)=>y.p-x.p);const assess=g=>{const a=geneticAssessment(g);return `<div class="card pad"><h3>${esc(g.name)}</h3><div class="muted">${sexLabel(g.sex)} · ${esc(comboAliasesForGecko(g).join(' / ')||g.morph||'모프 미입력')}</div><p><b>확실:</b> ${esc(a.certain.join(' · ')||'없음')}</p><p><b>가능:</b> ${esc(a.possible.join(' · ')||'없음')}</p></div>`};el.innerHTML=`${same?'<div class="notice danger">두 개체는 같은 성별로 확정되어 있어 실제 교배 대상은 아닙니다. 유전 계산 자체는 참고용으로 표시합니다.</div>':''}${(ld[2]||0)>0?'<div class="notice danger"><b>슈퍼 릴리 가능성이 포함됩니다.</b> 계산 결과에서는 제외하지 않고 그대로 표시합니다.</div>':''}<div class="grid cols-2">${assess(A)}${assess(B)}</div><div class="card" style="margin-top:18px"><div class="section-head" style="padding:18px 18px 0"><div><h2>예상 자손</h2><p>유전적으로 계산 가능한 릴리화이트·아잔틱·카푸치노를 조합한 결과입니다. 솔리드백은 정확한 멘델 확률 대신 가능성만 덧붙입니다.</p></div></div><div class="table-wrap"><table><thead><tr><th>확률</th><th>예상 모프 / 통용명</th><th>유전 상태</th><th>비고</th></tr></thead><tbody>${results.map(r=>`<tr><td><b>${pct(r.p)}</b></td><td class="name-cell"><b>${esc(r.title)}</b><span>${esc(r.aliases.join(' / '))}</span></td><td>${esc([r.a===1?'100% 헷 아잔틱':'',r.a===2?'비주얼 아잔틱':'',r.l===2?'슈퍼 릴리':'',r.c===2?'슈퍼 카푸치노':''].filter(Boolean).join(' · ')||'-')}</td><td>${r.l===2?'<span class="badge warn">슈퍼 릴리</span>':solid?'<span class="badge unknown">솔리드백 표현 가능성</span>':'-'}</td></tr>`).join('')}</tbody></table></div></div>`}
 
-function directParentChild(aId, bId) {
-  const a = getGecko(aId), b = getGecko(bId);
-  if (!a || !b) return false;
-  return [a.parent1Id, a.parent2Id].includes(bId) || [b.parent1Id, b.parent2Id].includes(aId);
-}
+function renderBackup(){const size=new Blob([JSON.stringify(state)]).size;$('#view-backup').innerHTML=`<div class="backup-grid"><div class="card backup-card"><h3>JSON 백업</h3><p>개체·성장·유전·가계도 데이터를 저장합니다.</p><button class="btn primary" id="exportBtn">백업 파일 다운로드</button></div><div class="card backup-card"><h3>JSON 복원</h3><p>기존 백업도 자동 마이그레이션합니다.</p><button class="btn secondary" id="importBtn">백업 파일 불러오기</button></div><div class="card backup-card"><h3>전체 초기화</h3><p>브라우저의 모든 기록을 삭제합니다.</p><button class="btn danger" id="resetBtn">모든 데이터 삭제</button></div></div><div class="card pad" style="margin-top:18px">개체 ${state.geckos.length}마리 · 성장 ${state.growth.length}개 · 교배 ${state.pairings.length}개 · ${(size/1024).toFixed(1)} KB</div>`;$('#exportBtn').onclick=exportData;$('#importBtn').onclick=()=>$('#importFile').click();$('#resetBtn').onclick=()=>{if(confirm('모든 데이터를 삭제할까요?')){state.geckos=[];state.growth=[];state.pairings=[];saveState();renderCurrent()}}}
+function exportData(){const blob=new Blob([JSON.stringify({...state,exportedAt:new Date().toISOString(),app:'Crestie Lineage',version:2},null,2)],{type:'application/json'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=`crestie-lineage-v2-${today()}.json`;a.click();URL.revokeObjectURL(u)}
+function importData(f){const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result);if(!Array.isArray(p.geckos))throw 0;if(!confirm('현재 데이터를 백업 파일 내용으로 바꿀까요?'))return;state.geckos=p.geckos.map(normalizeGecko);state.growth=Array.isArray(p.growth)?p.growth:[];state.pairings=Array.isArray(p.pairings)?p.pairings:[];saveState();renderCurrent()}catch{alert('올바른 백업 파일이 아닙니다.')}};r.readAsText(f)}
 
-function siblingRelation(aId, bId) {
-  const a = getGecko(aId), b = getGecko(bId);
-  if (!a || !b) return false;
-  const ap = [a.parent1Id, a.parent2Id].filter(Boolean);
-  const bp = [b.parent1Id, b.parent2Id].filter(Boolean);
-  return ap.length > 0 && bp.length > 0 && ap.some(id => bp.includes(id));
-}
-
-function ancestorsOf(id, out = new Set()) {
-  const g = getGecko(id);
-  if (!g) return out;
-  [g.parent1Id, g.parent2Id].filter(Boolean).forEach(p => {
-    if (!out.has(p)) { out.add(p); ancestorsOf(p, out); }
-  });
-  return out;
-}
-
-function relationOf(aId, bId) {
-  if (!aId || !bId) return '두 개체를 선택하세요.';
-  if (aId === bId) return '같은 개체끼리는 교배 관계로 등록할 수 없습니다.';
-  if (directParentChild(aId,bId)) return '직계 부모 · 자식 관계 — 등록 가능';
-  if (siblingRelation(aId,bId)) return '형제 · 자매 관계 — 등록 가능';
-  const aa = ancestorsOf(aId), bb = ancestorsOf(bId);
-  if (aa.has(bId) || bb.has(aId)) return '직계 조상 · 후손 관계 — 등록 가능';
-  if ([...aa].some(id => bb.has(id))) return '공통 조상이 있는 혈연 관계 — 등록 가능';
-  return '확인된 공통 조상 없음';
-}
-
-const viewMeta = {
-  dashboard: ['대시보드','크레스티드 게코의 성장과 혈통을 한곳에서 관리합니다.'],
-  geckos: ['개체 관리','이름, 모프, 성별, 부화일, 부모 정보를 관리합니다.'],
-  growth: ['성장 기록','날짜별 체중과 전장 변화를 기록하고 그래프로 확인합니다.'],
-  pedigree: ['교배 · 가계도','부모 관계와 교배 관계를 바탕으로 자동 가계도를 그립니다.'],
-  backup: ['백업 · 복원','모든 데이터를 JSON 파일로 내보내거나 다시 불러올 수 있습니다.']
-};
-
-function setView(name) {
-  currentView = name;
-  $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === name));
-  $$('.view').forEach(v => v.classList.toggle('active', v.id === `view-${name}`));
-  $('#viewTitle').textContent = viewMeta[name][0];
-  $('#viewSubtitle').textContent = viewMeta[name][1];
-  renderCurrent();
-}
-
-function renderCurrent() {
-  if (currentView === 'dashboard') renderDashboard();
-  if (currentView === 'geckos') renderGeckos();
-  if (currentView === 'growth') renderGrowth();
-  if (currentView === 'pedigree') renderPedigree();
-  if (currentView === 'backup') renderBackup();
-}
-
-function renderAll() {
-  saveState();
-  renderCurrent();
-}
-
-function renderDashboard() {
-  const latestRecords = [...state.growth].sort((a,b) => b.date.localeCompare(a.date)).slice(0,6);
-  const activePairs = state.pairings.filter(p => p.status !== 'closed');
-  const knownSex = state.geckos.filter(g => g.sex !== 'unknown').length;
-  const withParents = state.geckos.filter(g => g.parent1Id || g.parent2Id).length;
-
-  $('#view-dashboard').innerHTML = `
-    <div class="grid cols-4">
-      <div class="card stat-card"><div class="stat-label">등록 개체</div><div class="stat-value">${state.geckos.length}</div><div class="stat-sub">전체 크레스티드 게코</div></div>
-      <div class="card stat-card"><div class="stat-label">성별 확인</div><div class="stat-value">${knownSex}</div><div class="stat-sub">미확인 ${state.geckos.length-knownSex}마리</div></div>
-      <div class="card stat-card"><div class="stat-label">부모 정보 있음</div><div class="stat-value">${withParents}</div><div class="stat-sub">자동 가계도 연결 개체</div></div>
-      <div class="card stat-card"><div class="stat-label">진행 중 교배</div><div class="stat-value">${activePairs.length}</div><div class="stat-sub">계획·진행·산란·부화</div></div>
-    </div>
-    <div class="grid cols-2" style="margin-top:18px">
-      <div class="card pad">
-        <div class="section-head"><div><h2>최근 성장 기록</h2><p>가장 최근에 입력된 기록입니다.</p></div><button class="btn secondary small" data-go="growth">전체 보기</button></div>
-        ${latestRecords.length ? `<div class="list">${latestRecords.map(r => {
-          const g = getGecko(r.geckoId);
-          return `<div class="list-item"><div class="list-main"><b>${esc(g?.name || '삭제된 개체')}</b><span>${r.date}${r.note ? ` · ${esc(r.note)}`:''}</span></div><div class="kpi-line">${r.weight!=='' && r.weight!=null ? `<span class="badge">${r.weight} g</span>`:''}${r.length!=='' && r.length!=null ? `<span class="badge good">${r.length} cm</span>`:''}</div></div>`;
-        }).join('')}</div>` : emptyHtml('아직 성장 기록이 없습니다.','첫 체중 기록을 추가해 보세요.')}
-      </div>
-      <div class="card pad">
-        <div class="section-head"><div><h2>교배 관계</h2><p>최근 등록한 교배 계획과 진행 상태입니다.</p></div><button class="btn secondary small" data-go="pedigree">가계도 보기</button></div>
-        ${state.pairings.length ? `<div class="list">${[...state.pairings].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,6).map(p => `<div class="list-item"><div class="list-main"><b>${esc(geckoName(p.aId))} × ${esc(geckoName(p.bId))}</b><span>${fmtDate(p.date)} · ${esc(relationOf(p.aId,p.bId).replace(' — 등록 가능',''))}</span></div><span class="badge ${p.status==='closed'?'unknown':'warn'}">${statusLabel(p.status)}</span></div>`).join('')}</div>` : emptyHtml('등록된 교배 관계가 없습니다.','가계도에서 교배 관계를 추가할 수 있습니다.')}
-      </div>
-    </div>`;
-  $('#view-dashboard').querySelectorAll('[data-go]').forEach(b => b.onclick = () => setView(b.dataset.go));
-}
-
-function emptyHtml(title, sub) {
-  return `<div class="empty"><b>${title}</b><span>${sub}</span></div>`;
-}
-
-function renderGeckos() {
-  $('#view-geckos').innerHTML = `
-    <div class="card">
-      <div class="section-head" style="padding:18px 18px 0">
-        <div><h2>개체 목록</h2><p>부모 정보 수정 시 가계도도 즉시 다시 계산됩니다.</p></div>
-        <div class="toolbar"><input id="geckoSearch" class="search" placeholder="이름 또는 모프 검색" /><button class="btn primary" id="addGeckoInView">+ 개체 등록</button></div>
-      </div>
-      <div id="geckoTable"></div>
-    </div>`;
-  $('#addGeckoInView').onclick = () => openGeckoDialog();
-  $('#geckoSearch').oninput = e => renderGeckoTable(e.target.value);
-  renderGeckoTable('');
-}
-
-function renderGeckoTable(query='') {
-  const el = $('#geckoTable');
-  if (!el) return;
-  const q = query.trim().toLowerCase();
-  const list = state.geckos.filter(g => !q || g.name.toLowerCase().includes(q) || (g.morph||'').toLowerCase().includes(q));
-  if (!list.length) { el.innerHTML = emptyHtml(state.geckos.length?'검색 결과가 없습니다.':'등록된 개체가 없습니다.','개체를 등록하면 성장 기록과 가계도 기능을 사용할 수 있습니다.'); return; }
-  el.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>개체</th><th>성별</th><th>나이</th><th>최근 체중</th><th>부모 1</th><th>부모 2</th><th></th></tr></thead>
-    <tbody>${list.map(g => {
-      const last = latestGrowth(g.id);
-      return `<tr><td class="name-cell"><b>${esc(g.name)}</b><span>${esc(g.morph || '모프 미입력')}</span></td><td>${sexBadge(g.sex)}</td><td>${ageText(g.hatchDate)}</td><td>${last?.weight!=null && last.weight!=='' ? `${last.weight} g` : '-'}</td><td>${esc(geckoName(g.parent1Id))}</td><td>${esc(geckoName(g.parent2Id))}</td><td><div class="actions"><button class="btn secondary small" data-edit="${g.id}">수정</button><button class="btn ghost small" data-growth="${g.id}">성장</button><button class="btn ghost small" data-delete="${g.id}">삭제</button></div></td></tr>`;
-    }).join('')}</tbody>
-  </table></div>`;
-  el.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openGeckoDialog(b.dataset.edit));
-  el.querySelectorAll('[data-growth]').forEach(b => b.onclick = () => { growthSelectedGecko = b.dataset.growth; setView('growth'); });
-  el.querySelectorAll('[data-delete]').forEach(b => b.onclick = () => deleteGecko(b.dataset.delete));
-}
-
-function fillGeckoSelect(select, {includeBlank=false, excludeId=''}={}) {
-  select.innerHTML = `${includeBlank?'<option value="">없음 / 미등록</option>':''}${state.geckos.filter(g=>g.id!==excludeId).sort((a,b)=>a.name.localeCompare(b.name,'ko')).map(g=>`<option value="${g.id}">${esc(g.name)} · ${esc(g.morph||'모프 미입력')} · ${sexLabel(g.sex)}</option>`).join('')}`;
-}
-
-function openGeckoDialog(id='') {
-  const g = id ? getGecko(id) : null;
-  $('#geckoDialogTitle').textContent = g ? '개체 정보 수정' : '개체 등록';
-  $('#geckoId').value = g?.id || '';
-  $('#geckoName').value = g?.name || '';
-  $('#geckoMorph').value = g?.morph || '';
-  $('#geckoSex').value = g?.sex || 'unknown';
-  $('#geckoHatchDate').value = g?.hatchDate || '';
-  $('#geckoAcquiredDate').value = g?.acquiredDate || '';
-  $('#geckoBreeder').value = g?.breeder || '';
-  $('#geckoNotes').value = g?.notes || '';
-  fillGeckoSelect($('#geckoParent1'), {includeBlank:true, excludeId:id});
-  fillGeckoSelect($('#geckoParent2'), {includeBlank:true, excludeId:id});
-  $('#geckoParent1').value = g?.parent1Id || '';
-  $('#geckoParent2').value = g?.parent2Id || '';
-  $('#geckoFormError').classList.add('hidden');
-  $('#geckoDialog').showModal();
-}
-
-function saveGecko() {
-  const id = $('#geckoId').value;
-  const name = $('#geckoName').value.trim();
-  const p1 = $('#geckoParent1').value;
-  const p2 = $('#geckoParent2').value;
-  const err = $('#geckoFormError');
-  if (!name) { err.textContent='이름을 입력하세요.'; err.classList.remove('hidden'); return; }
-  if (p1 && p2 && p1 === p2) { err.textContent='부모 1과 부모 2에는 서로 다른 개체를 선택하세요.'; err.classList.remove('hidden'); return; }
-  if (id && ((p1 && isAncestor(id,p1)) || (p2 && isAncestor(id,p2)))) {
-    err.textContent='선택한 부모가 현재 개체의 후손이어서 가계도가 순환하게 됩니다. 부모·자식 교배 자체는 가능하지만, 한 개체가 자기 자신의 조상이 되는 구조만 막습니다.';
-    err.classList.remove('hidden'); return;
-  }
-  const data = {
-    id: id || uid(), name,
-    morph: $('#geckoMorph').value.trim(), sex: $('#geckoSex').value,
-    hatchDate: $('#geckoHatchDate').value, acquiredDate: $('#geckoAcquiredDate').value,
-    breeder: $('#geckoBreeder').value.trim(), notes: $('#geckoNotes').value.trim(),
-    parent1Id: p1, parent2Id: p2
-  };
-  if (id) Object.assign(getGecko(id), data); else state.geckos.push(data);
-  if (!growthSelectedGecko) growthSelectedGecko = data.id;
-  saveState();
-  $('#geckoDialog').close();
-  renderCurrent();
-}
-
-function deleteGecko(id) {
-  const g = getGecko(id); if (!g) return;
-  const children = state.geckos.filter(x => x.parent1Id===id || x.parent2Id===id).length;
-  const msg = `“${g.name}” 개체를 삭제할까요?\n성장 기록과 교배 기록도 함께 삭제됩니다.${children?`\n자식 ${children}마리의 부모 연결은 자동으로 해제됩니다.`:''}`;
-  if (!confirm(msg)) return;
-  state.geckos = state.geckos.filter(x => x.id !== id);
-  state.growth = state.growth.filter(x => x.geckoId !== id);
-  state.pairings = state.pairings.filter(x => x.aId !== id && x.bId !== id);
-  state.geckos.forEach(x => { if(x.parent1Id===id)x.parent1Id=''; if(x.parent2Id===id)x.parent2Id=''; });
-  if (growthSelectedGecko === id) growthSelectedGecko = state.geckos[0]?.id || '';
-  if (pedigreeSelectedId === id) pedigreeSelectedId = '';
-  renderAll();
-}
-
-function renderGrowth() {
-  if (!growthSelectedGecko || !getGecko(growthSelectedGecko)) growthSelectedGecko = state.geckos[0]?.id || '';
-  $('#view-growth').innerHTML = `
-    <div class="growth-layout">
-      <div class="card pad">
-        <div class="section-head"><div><h2>개체 선택</h2><p>선택한 개체의 성장 기록을 확인합니다.</p></div><button class="btn primary small" id="addGrowthInView" ${state.geckos.length?'':'disabled'}>+ 기록</button></div>
-        ${state.geckos.length ? `<label>개체<select id="growthFocus">${state.geckos.sort((a,b)=>a.name.localeCompare(b.name,'ko')).map(g=>`<option value="${g.id}" ${g.id===growthSelectedGecko?'selected':''}>${esc(g.name)} · ${esc(g.morph||'모프 미입력')}</option>`).join('')}</select></label><div id="growthSummary" style="margin-top:18px"></div>` : emptyHtml('먼저 개체를 등록하세요.','성장 기록은 등록된 개체에 연결됩니다.')}
-      </div>
-      <div class="card pad">
-        <div class="section-head"><div><h2>성장 그래프</h2><p>체중(g)과 전장(cm)을 날짜 순서로 표시합니다.</p></div><div class="legend"><span><i></i>체중</span><span><i class="length"></i>전장</span></div></div>
-        <div id="growthChart" class="chart-box"></div>
-      </div>
-    </div>
-    <div class="card" style="margin-top:18px">
-      <div class="section-head" style="padding:18px 18px 0"><div><h2>기록 내역</h2><p>수정하거나 삭제할 수 있습니다.</p></div></div>
-      <div id="growthTable"></div>
-    </div>`;
-  if (state.geckos.length) {
-    $('#growthFocus').onchange = e => { growthSelectedGecko = e.target.value; renderGrowth(); };
-    $('#addGrowthInView').onclick = () => openGrowthDialog('',growthSelectedGecko);
-  }
-  renderGrowthSubparts();
-}
-
-function renderGrowthSubparts() {
-  if (!growthSelectedGecko) {
-    $('#growthChart').innerHTML = emptyHtml('표시할 데이터가 없습니다.','개체를 등록하고 성장 기록을 추가하세요.');
-    $('#growthTable').innerHTML = emptyHtml('성장 기록이 없습니다.','');
-    return;
-  }
-  const g = getGecko(growthSelectedGecko);
-  const rows = state.growth.filter(r => r.geckoId===growthSelectedGecko).sort((a,b)=>a.date.localeCompare(b.date));
-  const last = rows.at(-1);
-  $('#growthSummary').innerHTML = `<div class="detail-grid">
-    <div class="detail-row"><span>이름</span><b>${esc(g.name)}</b></div>
-    <div class="detail-row"><span>모프</span><b>${esc(g.morph||'-')}</b></div>
-    <div class="detail-row"><span>부화일 / 나이</span><b>${fmtDate(g.hatchDate)} · ${ageText(g.hatchDate)}</b></div>
-    <div class="detail-row"><span>최근 체중</span><b>${last?.weight!=='' && last?.weight!=null ? `${last.weight} g`:'-'}</b></div>
-    <div class="detail-row"><span>최근 전장</span><b>${last?.length!=='' && last?.length!=null ? `${last.length} cm`:'-'}</b></div>
-    <div class="detail-row"><span>누적 기록</span><b>${rows.length}개</b></div>
-  </div>`;
-  $('#growthChart').innerHTML = growthChartSvg(rows);
-  $('#growthTable').innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>날짜</th><th>체중</th><th>전장</th><th>상태</th><th>메모</th><th></th></tr></thead><tbody>${[...rows].reverse().map(r=>`<tr><td>${r.date}</td><td>${r.weight!==''&&r.weight!=null?`${r.weight} g`:'-'}</td><td>${r.length!==''&&r.length!=null?`${r.length} cm`:'-'}</td><td>${esc(r.condition||'-')}</td><td>${esc(r.note||'-')}</td><td><div class="actions"><button class="btn secondary small" data-edit-growth="${r.id}">수정</button><button class="btn ghost small" data-delete-growth="${r.id}">삭제</button></div></td></tr>`).join('')}</tbody></table></div>` : emptyHtml('아직 기록이 없습니다.','체중 또는 전장을 추가하면 그래프가 자동으로 생성됩니다.');
-  $('#growthTable').querySelectorAll('[data-edit-growth]').forEach(b=>b.onclick=()=>openGrowthDialog(b.dataset.editGrowth));
-  $('#growthTable').querySelectorAll('[data-delete-growth]').forEach(b=>b.onclick=()=>deleteGrowth(b.dataset.deleteGrowth));
-}
-
-function growthChartSvg(rows) {
-  if (!rows.length) return emptyHtml('그래프 데이터가 없습니다.','첫 성장 기록을 추가해 보세요.');
-  const W=820,H=310, L=52,R=28,T=24,B=45;
-  const data = rows.map((r,i)=>({...r,i}));
-  const weights = data.filter(d=>d.weight!==''&&d.weight!=null).map(d=>Number(d.weight));
-  const lengths = data.filter(d=>d.length!==''&&d.length!=null).map(d=>Number(d.length));
-  if (!weights.length && !lengths.length) return emptyHtml('수치 데이터가 없습니다.','체중이나 전장을 입력하면 그래프가 표시됩니다.');
-  const all = [...weights,...lengths];
-  let min = Math.min(...all), max = Math.max(...all);
-  if (min===max){ min=Math.max(0,min-1); max+=1; }
-  const pad=(max-min)*.12; min=Math.max(0,min-pad); max+=pad;
-  const x = i => L + (data.length===1?(W-L-R)/2:i*(W-L-R)/(data.length-1));
-  const y = v => T + (max-Number(v))*(H-T-B)/(max-min);
-  const makePath = key => {
-    const pts=data.filter(d=>d[key]!==''&&d[key]!=null).map(d=>[x(d.i),y(d[key])]);
-    return pts.length ? `M ${pts.map(p=>p.join(' ')).join(' L ')}` : '';
-  };
-  const ticks=5;
-  const grid = Array.from({length:ticks},(_,i)=>{ const v=min+(max-min)*i/(ticks-1); const yy=y(v); return `<line class="chart-grid" x1="${L}" y1="${yy}" x2="${W-R}" y2="${yy}"/><text class="chart-label" x="${L-8}" y="${yy+4}" text-anchor="end">${v.toFixed(1)}</text>`; }).join('');
-  const labels = data.map((d,i)=> i===0 || i===data.length-1 || i%Math.ceil(data.length/5)===0 ? `<text class="chart-label" x="${x(i)}" y="${H-16}" text-anchor="middle">${d.date.slice(5)}</text>`:'').join('');
-  const wDots=data.filter(d=>d.weight!==''&&d.weight!=null).map(d=>`<circle class="chart-dot" cx="${x(d.i)}" cy="${y(d.weight)}" r="4"><title>${d.date}: ${d.weight} g</title></circle>`).join('');
-  const lDots=data.filter(d=>d.length!==''&&d.length!=null).map(d=>`<circle class="chart-dot secondary" cx="${x(d.i)}" cy="${y(d.length)}" r="4"><title>${d.date}: ${d.length} cm</title></circle>`).join('');
-  return `<svg class="chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="성장 그래프">${grid}<line class="chart-axis" x1="${L}" y1="${H-B}" x2="${W-R}" y2="${H-B}"/>${labels}<path class="chart-line" d="${makePath('weight')}"/>${wDots}<path class="chart-line secondary" d="${makePath('length')}"/>${lDots}</svg>`;
-}
-
-function openGrowthDialog(id='', geckoId='') {
-  if (!state.geckos.length) { alert('먼저 개체를 등록하세요.'); return; }
-  const r = id ? state.growth.find(x=>x.id===id) : null;
-  fillGeckoSelect($('#growthGecko'));
-  $('#growthId').value = r?.id || '';
-  $('#growthGecko').value = r?.geckoId || geckoId || growthSelectedGecko || state.geckos[0].id;
-  $('#growthDate').value = r?.date || today();
-  $('#growthWeight').value = r?.weight ?? '';
-  $('#growthLength').value = r?.length ?? '';
-  $('#growthCondition').value = r?.condition || '';
-  $('#growthNote').value = r?.note || '';
-  $('#growthDialog').showModal();
-}
-
-function saveGrowth() {
-  const id=$('#growthId').value, geckoId=$('#growthGecko').value, date=$('#growthDate').value;
-  if (!geckoId || !date) { alert('개체와 날짜를 선택하세요.'); return; }
-  const data={ id:id||uid(), geckoId, date, weight:$('#growthWeight').value===''?'':Number($('#growthWeight').value), length:$('#growthLength').value===''?'':Number($('#growthLength').value), condition:$('#growthCondition').value, note:$('#growthNote').value.trim() };
-  if(id) Object.assign(state.growth.find(x=>x.id===id),data); else state.growth.push(data);
-  growthSelectedGecko=geckoId; saveState(); $('#growthDialog').close(); if(currentView!=='growth')setView('growth'); else renderGrowth();
-}
-function deleteGrowth(id){ if(!confirm('이 성장 기록을 삭제할까요?'))return; state.growth=state.growth.filter(r=>r.id!==id); renderAll(); }
-
-function renderPedigree() {
-  $('#view-pedigree').innerHTML = `
-    <div class="notice">교배 관계는 혈연 여부와 관계없이 등록할 수 있습니다. 형제·자매, 부모·자식, 조상·후손 관계도 막지 않습니다. 단, 부모 정보를 잘못 수정해 한 개체가 자기 자신의 조상이 되는 순환 구조만 차단합니다.</div>
-    <div class="pedigree-layout" style="margin-top:18px">
-      <div class="card pedigree-canvas-card">
-        <div class="pedigree-toolbar"><div><b>자동 가계도</b><div style="font-size:11px;color:var(--muted);margin-top:3px">실선: 부모 → 자식 · 점선: 교배 관계</div></div><div class="toolbar"><button class="btn secondary small" id="pairAddBtn">+ 교배 관계</button><button class="btn secondary small" id="zoomOut">−</button><button class="btn secondary small" id="zoomReset">100%</button><button class="btn secondary small" id="zoomIn">+</button></div></div>
-        <div class="pedigree-viewport" id="pedigreeViewport"><svg id="pedigreeSvg"></svg></div>
-      </div>
-      <div class="card detail-card" id="pedigreeDetail"></div>
-    </div>
-    <div class="card" style="margin-top:18px">
-      <div class="section-head" style="padding:18px 18px 0"><div><h2>교배 기록 / 계획</h2><p>실제 자식이 태어나면 새 개체 등록 시 두 부모를 지정하면 됩니다.</p></div></div>
-      <div id="pairTable"></div>
-    </div>`;
-  $('#pairAddBtn').onclick=()=>openPairDialog();
-  $('#zoomIn').onclick=()=>{pedigreeScale=Math.min(1.8,pedigreeScale+.15); drawPedigree();};
-  $('#zoomOut').onclick=()=>{pedigreeScale=Math.max(.55,pedigreeScale-.15); drawPedigree();};
-  $('#zoomReset').onclick=()=>{pedigreeScale=1; drawPedigree();};
-  drawPedigree(); renderPairTable();
-}
-
-function computeLevels() {
-  const memo=new Map();
-  const visiting=new Set();
-  function level(id){
-    if(memo.has(id))return memo.get(id);
-    if(visiting.has(id))return 0;
-    visiting.add(id);
-    const g=getGecko(id); if(!g){visiting.delete(id);return 0;}
-    const ps=[g.parent1Id,g.parent2Id].filter(p=>getGecko(p));
-    const l=ps.length?Math.max(...ps.map(level))+1:0;
-    visiting.delete(id); memo.set(id,l); return l;
-  }
-  state.geckos.forEach(g=>level(g.id));
-  return memo;
-}
-
-function drawPedigree() {
-  const svg=$('#pedigreeSvg'); if(!svg)return;
-  if(!state.geckos.length){svg.setAttribute('viewBox','0 0 900 600');svg.innerHTML=`<text x="450" y="290" text-anchor="middle" fill="#718096" font-size="15">개체를 등록하면 가계도가 자동으로 생성됩니다.</text>`; renderPedigreeDetail(); return;}
-  const levels=computeLevels();
-  const groups={}; state.geckos.forEach(g=>{const l=levels.get(g.id)||0;(groups[l]??=[]).push(g);});
-  Object.values(groups).forEach(arr=>arr.sort((a,b)=>a.name.localeCompare(b.name,'ko')));
-  const nodeW=180,nodeH=76,gapX=54,gapY=115,pad=70;
-  const maxCount=Math.max(...Object.values(groups).map(a=>a.length));
-  const baseW=Math.max(920,pad*2+maxCount*nodeW+(maxCount-1)*gapX);
-  const levelKeys=Object.keys(groups).map(Number).sort((a,b)=>a-b);
-  const baseH=Math.max(620,pad*2+(Math.max(...levelKeys)+1)*nodeH+Math.max(...levelKeys)*gapY);
-  const pos=new Map();
-  levelKeys.forEach(l=>{
-    const arr=groups[l]; const rowW=arr.length*nodeW+(arr.length-1)*gapX; const start=(baseW-rowW)/2;
-    arr.forEach((g,i)=>pos.set(g.id,{x:start+i*(nodeW+gapX),y:pad+l*(nodeH+gapY)}));
-  });
-  const edges=[];
-  state.geckos.forEach(child=>{
-    const c=pos.get(child.id); [child.parent1Id,child.parent2Id].filter(p=>pos.has(p)).forEach(pid=>{
-      const p=pos.get(pid), x1=p.x+nodeW/2,y1=p.y+nodeH,x2=c.x+nodeW/2,y2=c.y;
-      const mid=(y1+y2)/2; edges.push(`<path class="pedge" d="M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2}"/>`);
-    });
-  });
-  const pairEdges=state.pairings.filter(p=>pos.has(p.aId)&&pos.has(p.bId)).map(p=>{
-    const a=pos.get(p.aId),b=pos.get(p.bId); const x1=a.x+nodeW/2,y1=a.y+nodeH/2,x2=b.x+nodeW/2,y2=b.y+nodeH/2;
-    const bend=Math.max(35,Math.abs(x2-x1)*.18); return `<path class="pair-edge" d="M ${x1} ${y1} C ${x1} ${y1-bend}, ${x2} ${y2-bend}, ${x2} ${y2}"><title>${esc(geckoName(p.aId))} × ${esc(geckoName(p.bId))} · ${statusLabel(p.status)}</title></path>`;
-  });
-  const nodes=state.geckos.map(g=>{
-    const p=pos.get(g.id), selected=g.id===pedigreeSelectedId?' selected':''; const sexClass=`sex-${g.sex}`;
-    const morph=(g.morph||'모프 미입력'); const short=morph.length>22?morph.slice(0,21)+'…':morph;
-    return `<g class="pnode${selected}" data-node-id="${g.id}" transform="translate(${p.x} ${p.y})"><rect width="${nodeW}" height="${nodeH}"/><circle class="${sexClass}" cx="18" cy="20" r="5"/><text class="name" x="30" y="25">${esc(g.name)}</text><text class="meta" x="16" y="47">${esc(short)}</text><text class="meta" x="16" y="65">${sexLabel(g.sex)} · ${g.hatchDate?ageText(g.hatchDate):'부화일 미입력'}</text></g>`;
-  }).join('');
-  const scaledW=baseW/pedigreeScale, scaledH=baseH/pedigreeScale;
-  svg.setAttribute('viewBox',`0 0 ${scaledW} ${scaledH}`); svg.setAttribute('width',baseW); svg.setAttribute('height',baseH);
-  svg.innerHTML=`<g transform="scale(${1/pedigreeScale})">${edges.join('')}${pairEdges.join('')}${nodes}</g>`;
-  svg.querySelectorAll('[data-node-id]').forEach(n=>n.addEventListener('click',()=>{pedigreeSelectedId=n.dataset.nodeId;drawPedigree();}));
-  $('#zoomReset').textContent=`${Math.round(pedigreeScale*100)}%`;
-  renderPedigreeDetail();
-}
-
-function renderPedigreeDetail() {
-  const el=$('#pedigreeDetail'); if(!el)return;
-  const g=getGecko(pedigreeSelectedId) || state.geckos[0];
-  if(!g){el.innerHTML=emptyHtml('선택된 개체가 없습니다.','가계도에서 개체를 클릭하세요.'); return;}
-  pedigreeSelectedId=g.id;
-  const children=state.geckos.filter(x=>x.parent1Id===g.id||x.parent2Id===g.id);
-  const mates=new Set(); state.pairings.forEach(p=>{if(p.aId===g.id)mates.add(p.bId);if(p.bId===g.id)mates.add(p.aId);});
-  const last=latestGrowth(g.id);
-  el.innerHTML=`<h3>${esc(g.name)}</h3><div class="muted">${esc(g.morph||'모프 미입력')} · ${sexLabel(g.sex)}</div>
-  <div class="detail-grid">
-    <div class="detail-row"><span>부화일</span><b>${fmtDate(g.hatchDate)}</b></div>
-    <div class="detail-row"><span>부모 1</span><b>${esc(geckoName(g.parent1Id))}</b></div>
-    <div class="detail-row"><span>부모 2</span><b>${esc(geckoName(g.parent2Id))}</b></div>
-    <div class="detail-row"><span>자식</span><b>${children.length}마리</b></div>
-    <div class="detail-row"><span>교배 상대</span><b>${mates.size}마리</b></div>
-    <div class="detail-row"><span>최근 체중</span><b>${last?.weight!==''&&last?.weight!=null?`${last.weight} g`:'-'}</b></div>
-  </div>
-  ${g.notes?`<div class="notice" style="margin-bottom:12px">${esc(g.notes)}</div>`:''}
-  <div class="toolbar"><button class="btn primary small" id="detailEdit">정보 수정</button><button class="btn secondary small" id="detailGrowth">성장 기록</button></div>`;
-  $('#detailEdit').onclick=()=>openGeckoDialog(g.id);
-  $('#detailGrowth').onclick=()=>{growthSelectedGecko=g.id;setView('growth');};
-}
-
-function renderPairTable() {
-  const el=$('#pairTable'); if(!el)return;
-  if(!state.pairings.length){el.innerHTML=emptyHtml('등록된 교배 관계가 없습니다.','교배 관계를 추가하면 가계도에 점선으로 표시됩니다.');return;}
-  el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>개체 A</th><th>개체 B</th><th>혈연 관계</th><th>날짜</th><th>상태</th><th></th></tr></thead><tbody>${state.pairings.map(p=>`<tr><td>${esc(geckoName(p.aId))}</td><td>${esc(geckoName(p.bId))}</td><td><span class="badge ${relationOf(p.aId,p.bId).includes('관계')?'warn':''}">${esc(relationOf(p.aId,p.bId).replace(' — 등록 가능',''))}</span></td><td>${fmtDate(p.date)}</td><td>${statusLabel(p.status)}</td><td><div class="actions"><button class="btn secondary small" data-edit-pair="${p.id}">수정</button><button class="btn ghost small" data-delete-pair="${p.id}">삭제</button></div></td></tr>`).join('')}</tbody></table></div>`;
-  el.querySelectorAll('[data-edit-pair]').forEach(b=>b.onclick=()=>openPairDialog(b.dataset.editPair));
-  el.querySelectorAll('[data-delete-pair]').forEach(b=>b.onclick=()=>{if(confirm('이 교배 관계를 삭제할까요?')){state.pairings=state.pairings.filter(p=>p.id!==b.dataset.deletePair);renderAll();}});
-}
-
-function openPairDialog(id='') {
-  if(state.geckos.length<2){alert('교배 관계를 만들려면 개체가 2마리 이상 필요합니다.');return;}
-  const p=id?state.pairings.find(x=>x.id===id):null;
-  fillGeckoSelect($('#pairA')); fillGeckoSelect($('#pairB'));
-  $('#pairId').value=p?.id||''; $('#pairA').value=p?.aId||state.geckos[0].id; $('#pairB').value=p?.bId||state.geckos[1].id;
-  $('#pairDate').value=p?.date||today(); $('#pairStatus').value=p?.status||'planned'; $('#pairNote').value=p?.note||'';
-  updatePairHint(); $('#pairA').onchange=updatePairHint; $('#pairB').onchange=updatePairHint; $('#pairDialog').showModal();
-}
-function updatePairHint(){ const text=relationOf($('#pairA').value,$('#pairB').value); $('#pairRelationHint').innerHTML=`관계 판정: <b>${esc(text)}</b>`; }
-function savePair(){
-  const id=$('#pairId').value,aId=$('#pairA').value,bId=$('#pairB').value;
-  if(!aId||!bId||aId===bId){alert('서로 다른 두 개체를 선택하세요.');return;}
-  const data={id:id||uid(),aId,bId,date:$('#pairDate').value,status:$('#pairStatus').value,note:$('#pairNote').value.trim()};
-  if(id)Object.assign(state.pairings.find(x=>x.id===id),data);else state.pairings.push(data);
-  saveState();$('#pairDialog').close();if(currentView!=='pedigree')setView('pedigree');else renderPedigree();
-}
-
-function renderBackup() {
-  const bytes=new Blob([JSON.stringify(state)]).size;
-  $('#view-backup').innerHTML=`
-  <div class="backup-grid">
-    <div class="card backup-card"><h3>JSON 백업</h3><p>개체, 성장 기록, 부모 관계, 교배 기록을 한 파일로 저장합니다. 다른 PC로 옮길 때 가장 안전한 방법입니다.</p><button class="btn primary" id="exportBtn">백업 파일 다운로드</button></div>
-    <div class="card backup-card"><h3>JSON 복원</h3><p>이 프로그램에서 내보낸 JSON 파일을 다시 불러옵니다. 현재 데이터는 불러온 데이터로 대체됩니다.</p><button class="btn secondary" id="importBtn">백업 파일 불러오기</button></div>
-    <div class="card backup-card"><h3>전체 초기화</h3><p>이 브라우저에 저장된 모든 기록을 삭제합니다. 필요하다면 먼저 백업 파일을 만들어 두세요.</p><button class="btn danger" id="resetBtn">모든 데이터 삭제</button></div>
-  </div>
-  <div class="card pad" style="margin-top:18px"><div class="section-head"><div><h2>현재 저장 상태</h2><p>브라우저 LocalStorage 기준</p></div></div><div class="detail-grid"><div class="detail-row"><span>개체</span><b>${state.geckos.length}마리</b></div><div class="detail-row"><span>성장 기록</span><b>${state.growth.length}개</b></div><div class="detail-row"><span>교배 기록</span><b>${state.pairings.length}개</b></div><div class="detail-row"><span>대략적 데이터 크기</span><b>${(bytes/1024).toFixed(1)} KB</b></div></div></div>`;
-  $('#exportBtn').onclick=exportData; $('#importBtn').onclick=()=>$('#importFile').click(); $('#resetBtn').onclick=resetData;
-}
-
-function exportData(){
-  const payload={...state, exportedAt:new Date().toISOString(), app:'Crestie Lineage', version:1};
-  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`crestie-lineage-backup-${today()}.json`; a.click(); URL.revokeObjectURL(url);
-}
-function importData(file){
-  const reader=new FileReader(); reader.onload=()=>{try{const p=JSON.parse(reader.result);if(!Array.isArray(p.geckos)||!Array.isArray(p.growth)||!Array.isArray(p.pairings))throw new Error();if(!confirm('현재 데이터를 백업 파일의 내용으로 바꿀까요?'))return;state.geckos=p.geckos;state.growth=p.growth;state.pairings=p.pairings;growthSelectedGecko=state.geckos[0]?.id||'';pedigreeSelectedId='';saveState();renderCurrent();alert('복원이 완료되었습니다.');}catch{alert('올바른 Crestie Lineage 백업 파일이 아닙니다.');}}; reader.readAsText(file);
-}
-function resetData(){if(!confirm('모든 개체, 성장 기록, 교배 기록을 완전히 삭제할까요?'))return;state.geckos=[];state.growth=[];state.pairings=[];growthSelectedGecko='';pedigreeSelectedId='';saveState();renderCurrent();}
-
-$$('.nav-btn').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
-$('#quickGeckoBtn').onclick=()=>openGeckoDialog();
-$('#quickGrowthBtn').onclick=()=>openGrowthDialog('',growthSelectedGecko);
-$('#saveGeckoBtn').onclick=saveGecko;
-$('#saveGrowthBtn').onclick=saveGrowth;
-$('#savePairBtn').onclick=savePair;
-$('#importFile').onchange=e=>{const f=e.target.files?.[0];if(f)importData(f);e.target.value='';};
-
-renderDashboard();
+$$('.nav-btn').forEach(b=>b.onclick=()=>setView(b.dataset.view));$('#quickGeckoBtn').onclick=()=>openGeckoDialog();$('#quickGrowthBtn').onclick=()=>openGrowthDialog('',growthSelectedGecko);$('#saveGeckoBtn').onclick=saveGecko;$('#saveGrowthBtn').onclick=saveGrowth;$('#savePairBtn').onclick=savePair;$('#analyzeNotationBtn').onclick=analyzeNotation;$('#importFile').onchange=e=>{const f=e.target.files?.[0];if(f)importData(f);e.target.value=''};renderDashboard();
