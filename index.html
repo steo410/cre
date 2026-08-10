@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0f172a" />
-  <title>Crestie Lineage - 크레스티드 게코 성장·가계도</title>
+  <title>Crestie Lineage v2 - 성장·유전·가계도</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -12,42 +12,30 @@
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">C</div>
-        <div>
-          <strong>Crestie Lineage</strong>
-          <span>성장 · 교배 · 가계도</span>
-        </div>
+        <div><strong>Crestie Lineage</strong><span>성장 · 유전 · 교배 · 가계도</span></div>
       </div>
-
       <nav class="nav" id="nav">
         <button class="nav-btn active" data-view="dashboard">대시보드</button>
         <button class="nav-btn" data-view="geckos">개체 관리</button>
         <button class="nav-btn" data-view="growth">성장 기록</button>
         <button class="nav-btn" data-view="pedigree">교배 · 가계도</button>
+        <button class="nav-btn" data-view="genetics">유전 · 교배 예상</button>
         <button class="nav-btn" data-view="backup">백업 · 복원</button>
       </nav>
-
-      <div class="sidebar-note">
-        <b>자동 저장</b>
-        <span>입력한 정보는 이 브라우저에 자동 저장됩니다.</span>
-      </div>
+      <div class="sidebar-note"><b>자동 저장</b><span>입력한 정보는 이 브라우저에 자동 저장됩니다.</span></div>
     </aside>
 
     <main class="main">
       <header class="topbar">
-        <div>
-          <h1 id="viewTitle">대시보드</h1>
-          <p id="viewSubtitle">크레스티드 게코의 성장과 혈통을 한곳에서 관리합니다.</p>
-        </div>
-        <div class="top-actions">
-          <button class="btn secondary" id="quickGrowthBtn">+ 성장 기록</button>
-          <button class="btn primary" id="quickGeckoBtn">+ 개체 등록</button>
-        </div>
+        <div><h1 id="viewTitle">대시보드</h1><p id="viewSubtitle">크레스티드 게코의 성장과 혈통을 한곳에서 관리합니다.</p></div>
+        <div class="top-actions"><button class="btn secondary" id="quickGrowthBtn">+ 성장 기록</button><button class="btn primary" id="quickGeckoBtn">+ 개체 등록</button></div>
       </header>
 
       <section id="view-dashboard" class="view active"></section>
       <section id="view-geckos" class="view"></section>
       <section id="view-growth" class="view"></section>
       <section id="view-pedigree" class="view"></section>
+      <section id="view-genetics" class="view"></section>
       <section id="view-backup" class="view"></section>
     </main>
   </div>
@@ -55,22 +43,15 @@
   <dialog id="geckoDialog" class="modal">
     <form method="dialog" id="geckoForm" class="modal-card">
       <div class="modal-head">
-        <div>
-          <h2 id="geckoDialogTitle">개체 등록</h2>
-          <p>기본 정보와 부모를 입력하면 가계도가 자동으로 갱신됩니다.</p>
-        </div>
+        <div><h2 id="geckoDialogTitle">개체 등록</h2><p>기본 정보·부모·유전 정보를 입력하면 가계도와 교배 예상이 자동 갱신됩니다.</p></div>
         <button value="cancel" class="icon-btn" aria-label="닫기">×</button>
       </div>
       <input type="hidden" id="geckoId" />
       <div class="form-grid two">
-        <label>이름<input id="geckoName" required placeholder="예: 루나" /></label>
-        <label>모프 / 품종<input id="geckoMorph" placeholder="예: 릴리화이트 아잔틱" /></label>
+        <label>이름<input id="geckoName" required placeholder="예: 북이" /></label>
+        <label>표시 모프 / 품종<input id="geckoMorph" placeholder="예: 릴잔틱 솔리드백" /></label>
         <label>성별
-          <select id="geckoSex">
-            <option value="unknown">미확인</option>
-            <option value="male">수컷</option>
-            <option value="female">암컷</option>
-          </select>
+          <select id="geckoSex"><option value="unknown">미확인</option><option value="male">수컷</option><option value="female">암컷</option></select>
         </label>
         <label>부화일<input id="geckoHatchDate" type="date" /></label>
         <label>입양 / 보유 시작일<input id="geckoAcquiredDate" type="date" /></label>
@@ -78,77 +59,85 @@
         <label>부모 1<select id="geckoParent1"></select></label>
         <label>부모 2<select id="geckoParent2"></select></label>
       </div>
-      <label>메모<textarea id="geckoNotes" rows="3" placeholder="유전 정보, 특징, 식성 등"></textarea></label>
-      <div id="geckoFormError" class="form-error hidden"></div>
-      <div class="modal-actions">
-        <button value="cancel" class="btn secondary">취소</button>
-        <button type="button" class="btn primary" id="saveGeckoBtn">저장</button>
+
+      <div class="subsection">
+        <div class="subsection-head"><div><h3>유전 정보</h3><p>확실히 아는 정보만 선택해도 됩니다. 미입력 값은 등록된 부모 정보에서 추론합니다.</p></div></div>
+        <div class="form-grid two">
+          <label>릴리화이트
+            <select id="geneLilly">
+              <option value="unknown">미확인 / 부모에서 추론</option>
+              <option value="normal">릴리 유전자 없음 확인</option>
+              <option value="lilly">릴리화이트 (1 copy)</option>
+              <option value="super">슈퍼 릴리 (2 copy · 이론/치사)</option>
+            </select>
+          </label>
+          <label>아잔틱
+            <select id="geneAxanthic">
+              <option value="unknown">미확인 / 부모에서 추론</option>
+              <option value="clear">아잔틱 유전자 없음 확인</option>
+              <option value="het100">100% 헷 아잔틱</option>
+              <option value="het66">66% 헷 아잔틱</option>
+              <option value="het50">50% 헷 아잔틱</option>
+              <option value="visual">비주얼 아잔틱</option>
+            </select>
+          </label>
+          <label>카푸치노
+            <select id="geneCappuccino">
+              <option value="unknown">미확인 / 부모에서 추론</option>
+              <option value="normal">카푸치노 유전자 없음 확인</option>
+              <option value="cappuccino">카푸치노 (1 copy)</option>
+              <option value="super">슈퍼 카푸치노 (2 copy)</option>
+            </select>
+          </label>
+          <label>솔리드백 표현형
+            <select id="traitSolidBack">
+              <option value="unknown">미확인</option>
+              <option value="present">솔리드백</option>
+              <option value="absent">솔리드백 아님</option>
+            </select>
+          </label>
+        </div>
+        <label>분양 표기 / 혈통 표기<input id="geckoNotation" placeholder="예: 릴리 100%헷아잔틱 / 북이x설기 / 웨코x노멀 (북이/설기)" /></label>
+        <label>기타 형질 / 라인<textarea id="geckoTraits" rows="2" placeholder="예: 화이트스팟, 포트홀, 레드베이스, 웨코 라인 등 (쉼표로 구분)"></textarea></label>
+        <div class="toolbar"><button type="button" class="btn secondary small" id="analyzeNotationBtn">표기에서 유전 정보 자동 인식</button></div>
+        <div id="notationHint" class="relation-hint"></div>
       </div>
+
+      <label>메모<textarea id="geckoNotes" rows="3" placeholder="특징, 식성, 산란, 건강 메모 등"></textarea></label>
+      <div id="geckoFormError" class="form-error hidden"></div>
+      <div class="modal-actions"><button value="cancel" class="btn secondary">취소</button><button type="button" class="btn primary" id="saveGeckoBtn">저장</button></div>
     </form>
   </dialog>
 
   <dialog id="growthDialog" class="modal">
     <form method="dialog" id="growthForm" class="modal-card small">
-      <div class="modal-head">
-        <div>
-          <h2>성장 기록 추가</h2>
-          <p>날짜별 체중과 전장을 기록합니다.</p>
-        </div>
-        <button value="cancel" class="icon-btn" aria-label="닫기">×</button>
-      </div>
+      <div class="modal-head"><div><h2>성장 기록 추가</h2><p>날짜별 체중과 전장을 기록합니다.</p></div><button value="cancel" class="icon-btn" aria-label="닫기">×</button></div>
       <input type="hidden" id="growthId" />
       <label>개체<select id="growthGecko" required></select></label>
       <div class="form-grid two">
         <label>날짜<input id="growthDate" type="date" required /></label>
         <label>체중 (g)<input id="growthWeight" type="number" min="0" step="0.01" placeholder="예: 32.4" /></label>
         <label>전장 (cm)<input id="growthLength" type="number" min="0" step="0.1" placeholder="예: 18.5" /></label>
-        <label>상태
-          <select id="growthCondition">
-            <option value="">선택 안 함</option>
-            <option>좋음</option>
-            <option>보통</option>
-            <option>관찰 필요</option>
-          </select>
-        </label>
+        <label>상태<select id="growthCondition"><option value="">선택 안 함</option><option>좋음</option><option>보통</option><option>관찰 필요</option></select></label>
       </div>
       <label>메모<textarea id="growthNote" rows="3" placeholder="탈피, 식사량, 산란 등"></textarea></label>
-      <div class="modal-actions">
-        <button value="cancel" class="btn secondary">취소</button>
-        <button type="button" class="btn primary" id="saveGrowthBtn">저장</button>
-      </div>
+      <div class="modal-actions"><button value="cancel" class="btn secondary">취소</button><button type="button" class="btn primary" id="saveGrowthBtn">저장</button></div>
     </form>
   </dialog>
 
   <dialog id="pairDialog" class="modal">
     <form method="dialog" class="modal-card small">
-      <div class="modal-head">
-        <div>
-          <h2>교배 관계 추가</h2>
-          <p>형제·자매 및 부모·자식 관계도 제한 없이 기록할 수 있습니다.</p>
-        </div>
-        <button value="cancel" class="icon-btn" aria-label="닫기">×</button>
-      </div>
+      <div class="modal-head"><div><h2>교배 관계 추가</h2><p>미확인 성별은 수컷/암컷 어느 쪽과도 선택할 수 있습니다.</p></div><button value="cancel" class="icon-btn" aria-label="닫기">×</button></div>
       <input type="hidden" id="pairId" />
       <div class="form-grid two">
         <label>개체 A<select id="pairA"></select></label>
         <label>개체 B<select id="pairB"></select></label>
         <label>교배 / 계획일<input id="pairDate" type="date" /></label>
-        <label>상태
-          <select id="pairStatus">
-            <option value="planned">계획</option>
-            <option value="paired">교배 진행</option>
-            <option value="eggs">산란 / 알</option>
-            <option value="hatched">부화 확인</option>
-            <option value="closed">종료</option>
-          </select>
-        </label>
+        <label>상태<select id="pairStatus"><option value="planned">계획</option><option value="paired">교배 진행</option><option value="eggs">산란 / 알</option><option value="hatched">부화 확인</option><option value="closed">종료</option></select></label>
       </div>
       <label>메모<textarea id="pairNote" rows="3" placeholder="교배 목적, 예상 모프, 산란 기록 등"></textarea></label>
       <div id="pairRelationHint" class="relation-hint"></div>
-      <div class="modal-actions">
-        <button value="cancel" class="btn secondary">취소</button>
-        <button type="button" class="btn primary" id="savePairBtn">저장</button>
-      </div>
+      <div class="modal-actions"><button value="cancel" class="btn secondary">취소</button><button type="button" class="btn primary" id="savePairBtn">저장</button></div>
     </form>
   </dialog>
 
