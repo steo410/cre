@@ -2,10 +2,9 @@ const OWNER = process.env.CRESTIE_GITHUB_OWNER || 'steo410';
 const REPO = process.env.CRESTIE_GITHUB_REPO || 'cre';
 const BRANCH = process.env.CRESTIE_GITHUB_DATA_BRANCH || 'crestie-data';
 
-function authOk(req) {
+function writeAuthOk(req) {
   const expected = process.env.CRESTIE_SYNC_KEY;
-  if (!expected) return true;
-  return req.headers['x-crestie-key'] === expected;
+  return !!expected && req.headers['x-crestie-key'] === expected;
 }
 
 function ghHeaders() {
@@ -19,8 +18,9 @@ function ghHeaders() {
 
 module.exports = async (req,res) => {
   res.setHeader('Cache-Control','no-store');
-  if (!authOk(req)) return res.status(401).json({error:'동기화 비밀번호가 올바르지 않습니다.'});
   if (req.method !== 'POST') return res.status(405).json({error:'Method not allowed'});
+  if (!process.env.CRESTIE_SYNC_KEY) return res.status(503).json({error:'CRESTIE_SYNC_KEY is not configured'});
+  if (!writeAuthOk(req)) return res.status(401).json({error:'동기화 비밀번호가 올바르지 않습니다.'});
   const token = process.env.CRESTIE_GITHUB_TOKEN;
   if (!token) return res.status(503).json({error:'CRESTIE_GITHUB_TOKEN is not configured'});
 
