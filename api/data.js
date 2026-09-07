@@ -3,10 +3,9 @@ const REPO = process.env.CRESTIE_GITHUB_REPO || 'cre';
 const BRANCH = process.env.CRESTIE_GITHUB_DATA_BRANCH || 'crestie-data';
 const PATH = 'data/cresties.json';
 
-function authOk(req) {
+function writeAuthOk(req) {
   const expected = process.env.CRESTIE_SYNC_KEY;
-  if (!expected) return true;
-  return req.headers['x-crestie-key'] === expected;
+  return !!expected && req.headers['x-crestie-key'] === expected;
 }
 
 function ghHeaders() {
@@ -48,13 +47,14 @@ async function writeFile(data, sha) {
 
 module.exports = async (req,res) => {
   res.setHeader('Cache-Control','no-store');
-  if (!authOk(req)) return res.status(401).json({error:'동기화 비밀번호가 올바르지 않습니다.'});
   try {
     if (req.method === 'GET') {
       const {data} = await readFile();
       return res.status(200).json(data);
     }
     if (req.method === 'POST') {
+      if (!process.env.CRESTIE_SYNC_KEY) return res.status(503).json({error:'CRESTIE_SYNC_KEY is not configured'});
+      if (!writeAuthOk(req)) return res.status(401).json({error:'동기화 비밀번호가 올바르지 않습니다.'});
       const incoming = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
       if (!incoming || !Array.isArray(incoming.geckos)) return res.status(400).json({error:'잘못된 데이터 형식입니다.'});
       const current = await readFile();
