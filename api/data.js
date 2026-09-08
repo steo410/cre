@@ -1,78 +1,63 @@
-const OWNER = process.env.CRESTIE_GITHUB_OWNER || 'steo410';
-const REPO = process.env.CRESTIE_GITHUB_REPO || 'cre';
-const BRANCH = process.env.CRESTIE_GITHUB_DATA_BRANCH || 'crestie-data';
-const PATH = 'data/cresties.json';
+import { list, put } from '@vercel/blob';
 
-function writeAuthOk(req) {
+const PREFIX = 'crestie/data/';
+const EMPTY = { version: 4, updatedAt: null, geckos: [], growth: [], pairings: [] };
+
+function authOk(req) {
   const expected = process.env.CRESTIE_SYNC_KEY;
-  return !!expected && req.headers['x-crestie-key'] === expected;
+  return !expected || req.headers['x-crestie-key'] === expected;
 }
 
-function ghHeaders() {
-  const token = process.env.CRESTIE_GITHUB_TOKEN;
-  return {
-    'Accept': 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-    ...(token ? {'Authorization': `Bearer ${token}`} : {})
-  };
+async function latestDataBlob() {
+  const result = await list({ prefix: PREFIX, limit: 1000 });
+  const blobs = (result.blobs || []).filter(b => b.pathname.endsWith('.json'));
+  blobs.sort((a,b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0));
+  return blobs[0] || null;
 }
 
-async function readFile() {
-  const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}?ref=${encodeURIComponent(BRANCH)}`;
-  const r = await fetch(url, {headers: ghHeaders()});
-  if (r.status === 404) return {sha:null, data:{version:3,updatedAt:null,geckos:[],growth:[],pairings:[]}};
-  if (!r.ok) throw new Error(`GitHub read failed: ${r.status}`);
-  const j = await r.json();
-  const text = Buffer.from(j.content.replace(/\n/g,''),'base64').toString('utf8');
-  return {sha:j.sha, data:JSON.parse(text)};
-}
-
-async function writeFile(data, sha) {
-  const token = process.env.CRESTIE_GITHUB_TOKEN;
-  if (!token) {
-    const e = new Error('CRESTIE_GITHUB_TOKEN is not configured');
-    e.code = 503; throw e;
-  }
-  const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
-  const body = {
-    message: `Sync Crestie data ${new Date().toISOString()}`,
-    content: Buffer.from(JSON.stringify(data,null,2),'utf8').toString('base64'),
-    branch: BRANCH,
-    ...(sha ? {sha} : {})
-  };
-  const r = await fetch(url,{method:'PUT',headers:{...ghHeaders(),'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if (!r.ok) throw new Error(`GitHub write failed: ${r.status} ${await r.text()}`);
+async function readLatest() {
+  const blob = await latestDataBlob();
+  if (!blob) return EMPTY;
+  const r = await fetch(`${blob.url}?v=${Date.now()}`, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`Blob read failed: ${r.status}`);
   return r.json();
 }
 
-module.exports = async (req,res) => {
-  res.setHeader('Cache-Control','no-store');
+export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   try {
     if (req.method === 'GET') {
-      const {data} = await readFile();
-      return res.status(200).json(data);
+      return res.status(200).json(await readLatest());
     }
     if (req.method === 'POST') {
-      if (!process.env.CRESTIE_SYNC_KEY) return res.status(503).json({error:'CRESTIE_SYNC_KEY is not configured'});
-      if (!writeAuthOk(req)) return res.status(401).json({error:'동기화 비밀번호가 올바르지 않습니다.'});
+      if (!authOk(req)) return res.status(401).json({ error: '동기화 비밀번호가 올바르지 않습니다.' });
       const incoming = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-      if (!incoming || !Array.isArray(incoming.geckos)) return res.status(400).json({error:'잘못된 데이터 형식입니다.'});
-      const current = await readFile();
+      if (!incoming || !Array.isArray(incoming.geckos)) return res.status(400).json({ error: '잘못된 데이터 형식입니다.' });
+      const updatedAt = new Date().toISOString();
       const data = {
-        version:3,
-        updatedAt:new Date().toISOString(),
-        geckos:incoming.geckos,
-        growth:Array.isArray(incoming.growth)?incoming.growth:[],
-        pairings:Array.isArray(incoming.pairings)?incoming.pairings:[]
+        version: 4,
+        updatedAt,
+        geckos: incoming.geckos,
+        growth: Array.isArray(incoming.growth) ? incoming.growth : [],
+        pairings: Array.isArray(incoming.pairings) ? incoming.pairings : []
       };
-      await writeFile(data,current.sha);
-      return res.status(200).json({ok:true,updatedAt:data.updatedAt});
+      const stamp = updatedAt.replace(/[:.]/g, '-');
+      await put(`${PREFIX}${stamp}.json`, JSON.stringify(data), {
+        access: 'public',
+        contentType: 'application/json',
+        addRandomSuffix: true,
+        cacheControlMaxAge: 60
+      });
+      return res.status(200).json({ ok: true, updatedAt });
     }
-    res.setHeader('Allow','GET, POST');
-    return res.status(405).json({error:'Method not allowed'});
-  } catch(e) {
-    const code=e.code||500;
+    res.setHeader('Allow', 'GET, POST');
+    return res.status(405).json({ error: 'Method not allowed' });
+  } catch (e) {
     console.error(e);
-    return res.status(code).json({error:e.message||'서버 오류'});
+    const msg = String(e?.message || e || '서버 오류');
+    if (msg.includes('BLOB_READ_WRITE_TOKEN') || msg.includes('No token')) {
+      return res.status(503).json({ error: 'Vercel Blob 저장소가 아직 프로젝트에 연결되지 않았습니다.' });
+    }
+    return res.status(500).json({ error: msg });
   }
-};
+}
