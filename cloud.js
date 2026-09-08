@@ -1,185 +1,28 @@
-/* Crestie Lineage v3 - GitHub Cloud Sync (safe migration hotfix) */
+/* Crestie Lineage v4 - Vercel Blob Sync */
 (() => {
-  const CLOUD_KEY = 'crestie-cloud-sync-key';
-  const BACKUP_KEY = 'crestie-local-backup-before-cloud';
-  const SYNC_INTERVAL = 2500;
-  let remoteLoaded = false;
-  let syncing = false;
-  let lastSnapshot = '';
-  let lastRemoteUpdate = null;
-  let photoFile = null;
+  const CLOUD_KEY='crestie-cloud-sync-key', BACKUP_KEY='crestie-local-backup-before-cloud';
+  let remoteLoaded=false,syncing=false,lastSnapshot='',lastRemoteUpdate=null,photoFile=null;
+  const getKey=()=>localStorage.getItem(CLOUD_KEY)||'';
+  const snap=()=>JSON.stringify({geckos:state.geckos,growth:state.growth,pairings:state.pairings});
+  const localHas=()=>!!(state.geckos.length||state.growth.length||state.pairings.length);
+  const remoteHas=d=>!!(d?.geckos?.length||d?.growth?.length||d?.pairings?.length);
+  const hdr=json=>({...json?{'Content-Type':'application/json'}:{},...getKey()?{'X-Crestie-Key':getKey()}:{}});
 
-  const getSyncKey = () => localStorage.getItem(CLOUD_KEY) || '';
-  const headers = (json=false) => ({
-    ...(json ? {'Content-Type':'application/json'} : {}),
-    ...(getSyncKey() ? {'X-Crestie-Key':getSyncKey()} : {})
-  });
-  const snapshot = () => JSON.stringify({geckos:state.geckos,growth:state.growth,pairings:state.pairings});
-  const hasLocalData = () => !!(state.geckos.length || state.growth.length || state.pairings.length);
-  const hasRemoteData = d => !!(d?.geckos?.length || d?.growth?.length || d?.pairings?.length);
+  function status(text,cls=''){let e=document.getElementById('cloudStatus');if(!e){e=document.createElement('button');e.id='cloudStatus';e.className='cloud-status';e.type='button';e.onclick=configure;document.querySelector('.top-actions')?.prepend(e)}e.textContent=text;e.dataset.state=cls}
+  async function api(path,opt={}){const r=await fetch(path,{...opt,headers:{...hdr(!!opt.body),...(opt.headers||{})},cache:'no-store'});const b=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(b.error||`HTTP ${r.status}`);e.status=r.status;throw e}return b}
+  function backup(){if(localHas())try{localStorage.setItem(BACKUP_KEY,JSON.stringify({savedAt:new Date().toISOString(),data:{geckos:state.geckos,growth:state.growth,pairings:state.pairings}}))}catch{}}
+  function apply(d){if(!d||!Array.isArray(d.geckos)||(!remoteHas(d)&&localHas()))return false;backup();state.geckos.splice(0,state.geckos.length,...d.geckos.map(normalizeGecko));state.growth.splice(0,state.growth.length,...(d.growth||[]));state.pairings.splice(0,state.pairings.length,...(d.pairings||[]));localStorage.setItem(STORAGE_KEY,JSON.stringify(state));lastSnapshot=snap();lastRemoteUpdate=d.updatedAt||null;renderCurrent();decorate();return true}
 
-  function setStatus(text, cls='') {
-    let el=document.getElementById('cloudStatus');
-    if(!el){
-      el=document.createElement('button'); el.id='cloudStatus'; el.className='cloud-status'; el.type='button'; el.title='GitHub 동기화 설정';
-      document.querySelector('.top-actions')?.prepend(el); el.onclick=configureSync;
-    }
-    el.textContent=text; el.dataset.state=cls;
-  }
+  async function push(force=false){if(syncing&&!force)return false;const now=snap();if(!force&&(!remoteLoaded||now===lastSnapshot))return false;const old=syncing;syncing=true;status('Vercel에 저장 중…','busy');try{const d=await api('/api/data',{method:'POST',body:JSON.stringify({geckos:state.geckos,growth:state.growth,pairings:state.pairings})});remoteLoaded=true;lastSnapshot=snap();lastRemoteUpdate=d.updatedAt;status('✓ Vercel 저장됨','ok');setTimeout(()=>status('☁ Vercel 동기화','ok'),1200);return true}catch(e){status(e.status===401?'🔒 비밀번호가 맞지 않음':e.status===503?'⚙ Blob 연결 필요':'저장 실패 · 로컬 유지','warn');console.warn(e);return false}finally{syncing=old}}
+  async function load(force=false){if(syncing)return;syncing=true;status('☁ Vercel 연결 중…','busy');try{const d=await api('/api/data');if(!remoteHas(d)&&localHas()){syncing=false;await push(true);return}if(remoteHas(d)&&(force||!remoteLoaded||d.updatedAt!==lastRemoteUpdate))apply(d);remoteLoaded=true;lastRemoteUpdate=d.updatedAt||lastRemoteUpdate;lastSnapshot=snap();status('☁ Vercel 동기화','ok')}catch(e){status(e.status===503?'⚙ Blob 연결 필요':'☁ 로컬 저장','warn');console.warn(e)}finally{syncing=false}}
+  function configure(){const k=prompt('Crestie 동기화 비밀번호를 입력하세요.\n(Vercel의 CRESTIE_SYNC_KEY와 같은 값)',getKey());if(k===null)return;k.trim()?localStorage.setItem(CLOUD_KEY,k.trim()):localStorage.removeItem(CLOUD_KEY);load(true)}
 
-  async function api(path, options={}) {
-    const res=await fetch(path,{...options,headers:{...headers(!!options.body),...(options.headers||{})},cache:'no-store'});
-    const body=await res.json().catch(()=>({}));
-    if(!res.ok){const e=new Error(body.error||`HTTP ${res.status}`);e.status=res.status;throw e;}
-    return body;
-  }
+  function installPhoto(){const notes=document.getElementById('geckoNotes');if(!notes||document.getElementById('geckoPhoto'))return;const box=document.createElement('div');box.className='photo-upload-box';box.innerHTML='<div class="photo-preview" id="geckoPhotoPreview"><span>사진 없음</span></div><div class="photo-controls"><b>개체 대표 사진</b><span>휴대폰 카메라/갤러리 또는 노트북 파일에서 선택하세요. 자동 압축 후 Vercel에 저장됩니다.</span><input id="geckoPhoto" type="file" accept="image/*" capture="environment" /></div>';notes.closest('label')?.before(box);document.getElementById('geckoPhoto').onchange=e=>{photoFile=e.target.files?.[0]||null;if(photoFile){const u=URL.createObjectURL(photoFile);document.getElementById('geckoPhotoPreview').innerHTML=`<img src="${u}" alt="선택한 사진">`}}}
+  function preview(g){const p=document.getElementById('geckoPhotoPreview');if(p)p.innerHTML=g?.photoUrl?`<img src="${g.photoUrl}" alt="${esc(g.name)}">`:'<span>사진 없음</span>'}
+  async function compress(f){const b=await createImageBitmap(f),m=1400,s=Math.min(1,m/Math.max(b.width,b.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(b.width*s));c.height=Math.max(1,Math.round(b.height*s));c.getContext('2d').drawImage(b,0,0,c.width,c.height);return await new Promise(r=>c.toBlob(r,'image/webp',.82))||f}
+  async function upload(g,f){status('사진 업로드 중…','busy');const blob=await compress(f),base64=await new Promise((ok,no)=>{const r=new FileReader;r.onload=()=>ok(String(r.result).split(',')[1]);r.onerror=no;r.readAsDataURL(blob)}),d=await api('/api/photo',{method:'POST',body:JSON.stringify({geckoId:g.id,contentBase64:base64,extension:'webp'})});g.photoUrl=d.url;g.photoPath=d.path;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));photoFile=null;preview(g);decorate();await push(true)}
+  function decorate(){document.querySelectorAll('#view-geckos tbody tr').forEach(row=>{const cell=row.querySelector('td');if(!cell||cell.querySelector('.gecko-thumb'))return;const g=state.geckos.find(x=>x.name===cell.querySelector('b')?.textContent);if(g?.photoUrl){const i=document.createElement('img');i.className='gecko-thumb';i.src=g.photoUrl;i.alt=g.name;cell.prepend(i);cell.classList.add('with-photo')}})}
+  function patch(){installPhoto();const d=document.getElementById('geckoDialog');new MutationObserver(()=>{if(d?.open){installPhoto();const id=document.getElementById('geckoId')?.value;preview(id?getGecko(id):null)}}).observe(d,{attributes:true,attributeFilter:['open']});document.getElementById('saveGeckoBtn')?.addEventListener('click',()=>{if(!photoFile)return;const ids=new Set(state.geckos.map(g=>g.id)),id=document.getElementById('geckoId').value,f=photoFile;setTimeout(async()=>{const g=id?getGecko(id):state.geckos.find(x=>!ids.has(x.id));if(g)try{await upload(g,f);renderCurrent();decorate()}catch(e){alert('사진 업로드 실패: '+e.message)}},180)},true)}
 
-  function backupLocal() {
-    if(!hasLocalData()) return;
-    try { localStorage.setItem(BACKUP_KEY, JSON.stringify({savedAt:new Date().toISOString(),data:{geckos:state.geckos,growth:state.growth,pairings:state.pairings}})); } catch {}
-  }
-
-  function applyRemote(data) {
-    if(!data || !Array.isArray(data.geckos)) return false;
-    // Never overwrite a non-empty local collection with a completely empty cloud file.
-    if(!hasRemoteData(data) && hasLocalData()) return false;
-    backupLocal();
-    state.geckos.splice(0,state.geckos.length,...data.geckos.map(normalizeGecko));
-    state.growth.splice(0,state.growth.length,...(Array.isArray(data.growth)?data.growth:[]));
-    state.pairings.splice(0,state.pairings.length,...(Array.isArray(data.pairings)?data.pairings:[]));
-    localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
-    if(!growthSelectedGecko || !getGecko(growthSelectedGecko)) growthSelectedGecko=state.geckos[0]?.id||'';
-    lastSnapshot=snapshot(); lastRemoteUpdate=data.updatedAt||null;
-    renderCurrent(); decoratePhotos(); return true;
-  }
-
-  async function pushRemote(force=false) {
-    if(syncing && !force) return false;
-    const now=snapshot();
-    if(!force && (!remoteLoaded || now===lastSnapshot)) return false;
-    if(!getSyncKey()){setStatus('🔒 동기화 비밀번호 필요','warn');return false;}
-    const previousSyncing=syncing; syncing=true; setStatus('저장 중…','busy');
-    try{
-      const data=await api('/api/data',{method:'POST',body:JSON.stringify({geckos:state.geckos,growth:state.growth,pairings:state.pairings})});
-      remoteLoaded=true; lastSnapshot=snapshot(); lastRemoteUpdate=data.updatedAt||new Date().toISOString();
-      setStatus('✓ GitHub 저장됨','ok'); setTimeout(()=>setStatus('☁ GitHub 동기화','ok'),1200); return true;
-    }catch(e){
-      if(e.status===401)setStatus('🔒 비밀번호가 맞지 않음','warn');
-      else if(e.status===503)setStatus('⚙ GitHub 토큰 설정 필요','warn');
-      else setStatus('저장 실패 · 로컬 유지','warn');
-      console.warn('Cloud save:',e); return false;
-    }finally{syncing=previousSyncing;}
-  }
-
-  async function loadRemote(force=false) {
-    if(syncing) return;
-    syncing=true; setStatus('☁ 연결 확인…','busy');
-    try{
-      const data=await api('/api/data');
-      const remoteHas=hasRemoteData(data), localHas=hasLocalData();
-
-      // Critical safety rule: an empty GitHub file must NEVER erase local records.
-      if(!remoteHas && localHas){
-        if(!getSyncKey()){
-          remoteLoaded=false;
-          setStatus('🔒 비밀번호 입력 후 기존 자료 이전','warn');
-          return;
-        }
-        setStatus('기존 자료 GitHub로 이전 중…','busy');
-        const ok=await pushRemote(true);
-        if(ok) setStatus('✓ 기존 자료 이전 완료','ok');
-        return;
-      }
-
-      if(remoteHas){
-        if(force || !remoteLoaded || (data.updatedAt && data.updatedAt!==lastRemoteUpdate)) applyRemote(data);
-        remoteLoaded=true; lastRemoteUpdate=data.updatedAt||lastRemoteUpdate;
-        setStatus('☁ GitHub 동기화','ok');
-        return;
-      }
-
-      // Both sides empty: simply establish the connection, without changing anything.
-      remoteLoaded=true; lastSnapshot=snapshot(); lastRemoteUpdate=data.updatedAt||null;
-      setStatus(getSyncKey()?'☁ GitHub 동기화':'🔒 동기화 비밀번호 필요',getSyncKey()?'ok':'warn');
-    }catch(e){
-      if(e.status===401)setStatus('🔒 비밀번호가 맞지 않음','warn');
-      else if(e.status===503)setStatus('⚙ GitHub 설정 필요','warn');
-      else setStatus('☁ 오프라인 저장','warn');
-      console.warn('Cloud load:',e);
-    }finally{syncing=false;}
-  }
-
-  function configureSync(){
-    const key=prompt('Crestie 동기화 비밀번호를 입력하세요.\n(Vercel의 CRESTIE_SYNC_KEY와 같은 값)',getSyncKey());
-    if(key===null)return;
-    if(key.trim())localStorage.setItem(CLOUD_KEY,key.trim()); else localStorage.removeItem(CLOUD_KEY);
-    setStatus('GitHub 연결 확인…','busy'); loadRemote(true);
-  }
-
-  function installCloudCard(){
-    const note=document.querySelector('.sidebar-note');
-    if(note){note.innerHTML='<b>GitHub Cloud</b><span>기록과 사진을 GitHub에 저장해 여러 기기에서 동기화합니다.</span>';note.style.cursor='pointer';note.onclick=configureSync;}
-  }
-
-  function installPhotoUI(){
-    const notes=document.getElementById('geckoNotes');
-    if(!notes || document.getElementById('geckoPhoto'))return;
-    const box=document.createElement('div'); box.className='photo-upload-box';
-    box.innerHTML=`<div class="photo-preview" id="geckoPhotoPreview"><span>사진 없음</span></div><div class="photo-controls"><b>개체 대표 사진</b><span>휴대폰 카메라/갤러리 또는 노트북 파일에서 선택할 수 있습니다.</span><input id="geckoPhoto" type="file" accept="image/*" capture="environment" /></div>`;
-    notes.closest('label')?.before(box);
-    document.getElementById('geckoPhoto').addEventListener('change',e=>{photoFile=e.target.files?.[0]||null;if(photoFile)showLocalPreview(photoFile);});
-  }
-
-  function showLocalPreview(file){
-    const p=document.getElementById('geckoPhotoPreview');if(!p)return;
-    const url=URL.createObjectURL(file);p.innerHTML=`<img src="${url}" alt="선택한 사진" />`;
-  }
-  function updatePhotoPreview(g){
-    const p=document.getElementById('geckoPhotoPreview');if(!p)return;
-    p.innerHTML=g?.photoUrl?`<img src="${g.photoUrl}?v=${Date.now()}" alt="${esc(g.name)}" />`:'<span>사진 없음</span>';
-  }
-  async function compressImage(file){
-    const bitmap=await createImageBitmap(file), max=1400, scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));
-    const c=document.createElement('canvas');c.width=Math.max(1,Math.round(bitmap.width*scale));c.height=Math.max(1,Math.round(bitmap.height*scale));c.getContext('2d').drawImage(bitmap,0,0,c.width,c.height);
-    return await new Promise(r=>c.toBlob(r,'image/webp',0.82)) || file;
-  }
-  async function uploadPhoto(g,file){
-    if(!getSyncKey())throw new Error('먼저 동기화 비밀번호를 입력하세요.');
-    setStatus('사진 업로드 중…','busy');
-    const blob=await compressImage(file);
-    const base64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=reject;r.readAsDataURL(blob);});
-    const result=await api('/api/photo',{method:'POST',body:JSON.stringify({geckoId:g.id,contentBase64:base64,extension:'webp'})});
-    g.photoUrl=result.url;g.photoPath=result.path;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));photoFile=null;
-    const f=document.getElementById('geckoPhoto');if(f)f.value='';updatePhotoPreview(g);decoratePhotos();await pushRemote(true);
-  }
-
-  function decoratePhotos(){
-    document.querySelectorAll('#view-geckos tbody tr').forEach(row=>{
-      const cell=row.querySelector('td');if(!cell||cell.querySelector('.gecko-thumb'))return;
-      const name=cell.querySelector('b')?.textContent,g=state.geckos.find(x=>x.name===name);
-      if(g?.photoUrl){const img=document.createElement('img');img.className='gecko-thumb';img.src=g.photoUrl;img.alt=g.name;cell.prepend(img);cell.classList.add('with-photo');}
-    });
-  }
-
-  function patchDialogs(){
-    installPhotoUI();
-    const dialog=document.getElementById('geckoDialog');
-    dialog?.addEventListener('close',()=>{photoFile=null;});
-    new MutationObserver(()=>{
-      if(dialog?.open){installPhotoUI();const id=document.getElementById('geckoId')?.value;updatePhotoPreview(id?getGecko(id):null);}
-    }).observe(dialog,{attributes:true,attributeFilter:['open']});
-    document.getElementById('saveGeckoBtn')?.addEventListener('click',()=>{
-      if(!photoFile)return;
-      const before=new Set(state.geckos.map(g=>g.id)), existing=document.getElementById('geckoId').value, selected=photoFile;
-      setTimeout(async()=>{const g=existing?getGecko(existing):state.geckos.find(x=>!before.has(x.id));if(!g)return;try{await uploadPhoto(g,selected);renderCurrent();decoratePhotos();}catch(e){alert('사진 업로드에 실패했습니다: '+e.message);}},180);
-    },true);
-  }
-
-  document.addEventListener('DOMContentLoaded',async()=>{
-    installCloudCard();patchDialogs();setStatus('☁ 연결 중…','busy');
-    await loadRemote();decoratePhotos();
-    setInterval(()=>pushRemote(false),SYNC_INTERVAL);
-    setInterval(()=>loadRemote(false),30000);
-    new MutationObserver(decoratePhotos).observe(document.querySelector('.main')||document.body,{childList:true,subtree:true});
-  });
+  document.addEventListener('DOMContentLoaded',async()=>{const n=document.querySelector('.sidebar-note');if(n){n.innerHTML='<b>Vercel Cloud</b><span>기록과 사진을 Vercel Blob에 저장해 여러 기기에서 동기화합니다.</span>';n.onclick=configure;n.style.cursor='pointer'}patch();await load();decorate();setInterval(()=>push(false),3000);setInterval(()=>load(false),30000);new MutationObserver(decorate).observe(document.querySelector('.main')||document.body,{childList:true,subtree:true})});
 })();
