@@ -1,0 +1,9 @@
+{
+  "name": "crestie-lineage",
+  "version": "4.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@vercel/blob": "latest"
+  }
+}
