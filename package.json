@@ -1,9 +1,12 @@
 {
   "name": "crestie-lineage",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@vercel/blob": "latest"
+    "@vercel/blob": "2.8.0"
+  },
+  "scripts": {
+    "test": "node --experimental-vm-modules --test tests/*.test.js"
   }
 }
