@@ -1,6 +1,6 @@
 {
   "version": 6,
-  "updatedAt": "2026-09-13T15:00:21.501Z",
+  "updatedAt": "2026-09-13T15:00:40.370Z",
   "geckos": [
     {
       "id": "mtzxvm1y-xkhj3s",
@@ -40,6 +40,26 @@
         "axanthic": "unknown",
         "cappuccino": "unknown",
         "solidBack": "unknown"
+      }
+    },
+    {
+      "id": "mtzxy8k3-wlk316",
+      "name": "솔리드",
+      "morph": "솔리드릴리",
+      "sex": "male",
+      "hatchDate": "2025-07-05",
+      "acquiredDate": "2026-08-09",
+      "breeder": "아스트로",
+      "notes": "",
+      "parent1Id": "",
+      "parent2Id": "",
+      "breederNotation": "",
+      "customTraits": [],
+      "genetics": {
+        "lilly": "lilly",
+        "axanthic": "unknown",
+        "cappuccino": "unknown",
+        "solidBack": "present"
       }
     }
   ],
