@@ -1,6 +1,6 @@
 {
   "version": 6,
-  "updatedAt": "2026-09-13T15:03:13.633Z",
+  "updatedAt": "2026-09-13T15:03:27.045Z",
   "geckos": [
     {
       "id": "mtzxvm1y-xkhj3s",
@@ -127,6 +127,15 @@
       "geckoId": "mtzxvm1y-xkhj3s",
       "date": "2026-09-13",
       "weight": 3,
+      "length": "",
+      "condition": "",
+      "note": ""
+    },
+    {
+      "id": "mtzy1t3f-6xbleh",
+      "geckoId": "mtzxxib8-ysq8gv",
+      "date": "2026-09-13",
+      "weight": 4,
       "length": "",
       "condition": "",
       "note": ""
