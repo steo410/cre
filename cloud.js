@@ -78,7 +78,7 @@
         remember(sent);
         again = !equal(current(), sent);
       }
-      status(again ? '추가 변경 저장 대기 중…' : '✓ 클라우드 저장됨', again ? 'busy' : 'ok');
+      status(again ? '추가 변경 저장 대기 중…' : received.canWrite === false ? '조회 연결됨 · 저장 비밀번호 입력' : '✓ 클라우드 저장됨', again ? 'busy' : received.canWrite === false ? 'warn' : 'ok');
     } catch (error) {
       again = error.status === 409;
       status(again ? '다른 기기의 변경 확인 중…' : error.status === 401 ? '비밀번호 필요 · 눌러서 입력' : error.status === 503 ? '저장소 연결 필요 · 이 기기에 저장됨' : '연결 실패 · 이 기기에 저장됨', 'warn');

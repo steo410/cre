@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && key && req.headers['x-crestie-key'] !== key) return res.status(401).json({ error: '동기화 비밀번호를 확인해 주세요.' });
     if (req.method === 'GET') {
       const current = await readCurrent();
-      return res.status(200).json({ ...current.data, revision: current.revision, passwordRequired: !!key });
+      return res.status(200).json({ ...current.data, revision: current.revision, passwordRequired: !!key, canWrite: !key || req.headers['x-crestie-key'] === key });
     }
     let incoming;
     try { incoming = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }

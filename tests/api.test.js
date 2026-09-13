@@ -60,6 +60,8 @@ test('server bypasses cached reads and reports password requirement', async () =
   await s.request('POST', { ...doc(), baseRevision: null });
   const read = await s.request('GET');
   assert.equal(read.body.passwordRequired, true);
+  assert.equal(read.body.canWrite, true);
+  assert.equal((await s.request('GET', undefined, '')).body.canWrite, false);
   assert.equal(read.body.geckos[0].name, '테스트');
   assert.ok(s.reads.every(o => o.useCache === false));
 });
