@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "node scripts/verify-storage.mjs",
+  "buildCommand": "node scripts/build.mjs",
+  "outputDirectory": "public",
   "git": { "deploymentEnabled": { "crestie-data": false } }
 }

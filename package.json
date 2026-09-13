@@ -6,6 +6,6 @@
   "dependencies": {},
   "scripts": {
     "test": "node --experimental-vm-modules --test tests/*.test.js",
-    "build": "node scripts/verify-storage.mjs"
+    "build": "node scripts/build.mjs"
   }
 }
