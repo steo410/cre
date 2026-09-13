@@ -20,9 +20,10 @@
     el.textContent = text; el.dataset.state = cls;
   }
   async function api(path, options = {}) {
+    const digest = getKey() ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(getKey().trim()))), byte => byte.toString(16).padStart(2, '0')).join('') : '';
     const response = await fetch(path, {
-      ...options, cache: 'no-store', signal: AbortSignal.timeout(20000),
-      headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(getKey() ? { 'X-Crestie-Key': getKey() } : {}) }
+      ...options, cache: 'no-store', signal: AbortSignal.timeout(30000),
+      headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(digest ? { 'X-Crestie-Auth': digest } : {}) }
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) { const error = new Error(body.error || '서버에 연결하지 못했습니다.'); error.status = response.status; throw error; }
@@ -78,10 +79,11 @@
         remember(sent);
         again = !equal(current(), sent);
       }
-      status(again ? '추가 변경 저장 대기 중…' : received.canWrite === false ? '조회 연결됨 · 저장 비밀번호 입력' : '✓ 클라우드 저장됨', again ? 'busy' : received.canWrite === false ? 'warn' : 'ok');
+      status(again ? '추가 변경 저장 대기 중…' : received.canWrite === false ? '조회 연결됨 · 저장 비밀번호 입력' : '✓ GitHub 저장됨', again ? 'busy' : received.canWrite === false ? 'warn' : 'ok');
     } catch (error) {
       again = error.status === 409;
-      status(again ? '다른 기기의 변경 확인 중…' : error.status === 401 ? '비밀번호 필요 · 눌러서 입력' : error.status === 503 ? '저장소 연결 필요 · 이 기기에 저장됨' : '연결 실패 · 이 기기에 저장됨', 'warn');
+      status(again ? '다른 기기의 변경 확인 중…' : error.status === 401 ? '비밀번호 필요 · 눌러서 입력' : error.status === 503 ? 'GitHub 연결 확인 필요 · 이 기기에 저장됨' : '연결 실패 · 이 기기에 저장됨', 'warn');
+      const el = document.getElementById('cloudStatus'); if (el) el.title = error.message;
       console.warn('Crestie sync:', error.message);
     } finally {
       syncing = false;
@@ -90,7 +92,7 @@
   }
   function configure() {
     if (conflict) { showConflict(); return; }
-    if (passwordRequired) {
+    if (passwordRequired || !getKey()) {
       const key = prompt('기록 저장용 비밀번호를 입력하세요. 처음 연결한 기기에서 한 번만 입력하면 됩니다.', getKey());
       if (key === null) return;
       key.trim() ? localStorage.setItem(CLOUD_KEY, key.trim()) : localStorage.removeItem(CLOUD_KEY);
@@ -120,10 +122,10 @@
     dialog.addEventListener('cancel', () => { dialog.remove(); });
     document.body.append(dialog); dialog.showModal();
   }
-  function installPhoto(){const notes=document.getElementById('geckoNotes');if(!notes||document.getElementById('geckoPhoto'))return;const box=document.createElement('div');box.className='photo-upload-box';box.innerHTML='<div class="photo-preview" id="geckoPhotoPreview"><span>사진 없음</span></div><div class="photo-controls"><b>개체 대표 사진</b><span>휴대폰 카메라/갤러리 또는 노트북 파일에서 선택하세요. 자동 압축 후 Vercel에 저장됩니다.</span><input id="geckoPhoto" type="file" accept="image/*" /></div>';notes.closest('label')?.before(box);document.getElementById('geckoPhoto').onchange=e=>{photoFile=e.target.files?.[0]||null;if(photoFile){const u=URL.createObjectURL(photoFile);document.getElementById('geckoPhotoPreview').innerHTML=`<img src="${u}" alt="선택한 사진">`}}}
+  function installPhoto(){const notes=document.getElementById('geckoNotes');if(!notes||document.getElementById('geckoPhoto'))return;const box=document.createElement('div');box.className='photo-upload-box';box.innerHTML='<div class="photo-preview" id="geckoPhotoPreview"><span>사진 없음</span></div><div class="photo-controls"><b>개체 대표 사진</b><span>휴대폰 카메라/갤러리 또는 노트북 파일에서 선택하세요. 자동 압축 후 GitHub에 저장됩니다.</span><input id="geckoPhoto" type="file" accept="image/*" /></div>';notes.closest('label')?.before(box);document.getElementById('geckoPhoto').onchange=e=>{photoFile=e.target.files?.[0]||null;if(photoFile){const u=URL.createObjectURL(photoFile);document.getElementById('geckoPhotoPreview').innerHTML=`<img src="${u}" alt="선택한 사진">`}}}
   function preview(g){const p=document.getElementById('geckoPhotoPreview');if(p)p.innerHTML=g?.photoUrl?`<img src="${g.photoUrl}" alt="${esc(g.name)}">`:'<span>사진 없음</span>'}
   async function compress(f){const b=await createImageBitmap(f),m=1400,s=Math.min(1,m/Math.max(b.width,b.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(b.width*s));c.height=Math.max(1,Math.round(b.height*s));c.getContext('2d').drawImage(b,0,0,c.width,c.height);return await new Promise(r=>c.toBlob(r,'image/webp',.82))||f}
-  async function upload(g,f){status('사진 업로드 중…','busy');const blob=await compress(f),base64=await new Promise((ok,no)=>{const r=new FileReader;r.onload=()=>ok(String(r.result).split(',')[1]);r.onerror=no;r.readAsDataURL(blob)}),d=await api('/api/photo',{method:'POST',body:JSON.stringify({geckoId:g.id,contentBase64:base64,extension:blob.type==='image/png'?'png':'webp'})});g.photoUrl=d.url;g.photoPath=d.path;saveState();photoFile=null;preview(g);decorate();schedule(0)}
+  async function upload(g,f){status('사진 업로드 중…','busy');const blob=await compress(f),base64=await new Promise((ok,no)=>{const r=new FileReader;r.onload=()=>ok(String(r.result).split(',')[1]);r.onerror=no;r.readAsDataURL(blob)}),d=await api('/api/photo',{method:'POST',body:JSON.stringify({geckoId:g.id,contentBase64:base64,extension:blob.type==='image/png'?'png':'webp'})});const target=getGecko(g.id);if(!target)return;target.photoUrl=d.url;target.photoPath=d.path;saveState();photoFile=null;preview(target);decorate();schedule(0)}
   function decorate(){document.querySelectorAll('#view-geckos tbody tr').forEach(row=>{const cell=row.querySelector('td');if(!cell||cell.querySelector('.gecko-thumb'))return;const g=state.geckos.find(x=>x.name===cell.querySelector('b')?.textContent);if(g?.photoUrl){const i=document.createElement('img');i.className='gecko-thumb';i.src=g.photoUrl;i.alt=g.name;cell.prepend(i);cell.classList.add('with-photo')}})}
   function patch() {
     installPhoto();
@@ -151,7 +153,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     const note = document.querySelector('.sidebar-note');
-    if (note) note.innerHTML = '<b>기기 간 자동 저장</b><span>같은 사이트를 열면 노트북과 휴대폰에서 기록을 함께 볼 수 있습니다. 상단의 클라우드 저장 완료 표시를 확인하세요.</span>';
+    if (note) note.innerHTML = '<b>기기 간 자동 저장</b><span>같은 사이트를 열면 노트북과 휴대폰에서 기록을 함께 볼 수 있습니다. 상단의 GitHub 저장 완료 표시를 확인하세요.</span>';
     patch(); run(); decorate();
     window.addEventListener('crestie:changed', () => { status('이 기기에 저장됨 · 클라우드 저장 대기', 'busy'); schedule(); });
     window.addEventListener('online', () => schedule(0));
