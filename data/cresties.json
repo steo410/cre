@@ -1,6 +1,6 @@
 {
   "version": 6,
-  "updatedAt": "2026-09-13T15:04:13.048Z",
+  "updatedAt": "2026-09-13T15:04:14.852Z",
   "geckos": [
     {
       "id": "mtzxvm1y-xkhj3s",
@@ -163,6 +163,24 @@
       "geckoId": "mtzxy8k3-wlk316",
       "date": "2026-09-13",
       "weight": 23,
+      "length": "",
+      "condition": "",
+      "note": ""
+    },
+    {
+      "id": "mtzy2ll7-9ax29z",
+      "geckoId": "mtzxy8k3-wlk316",
+      "date": "2026-08-09",
+      "weight": 18,
+      "length": "",
+      "condition": "",
+      "note": ""
+    },
+    {
+      "id": "mtzy2sjm-c1ofgu",
+      "geckoId": "mtzxy8k3-wlk316",
+      "date": "2026-08-30",
+      "weight": 20,
       "length": "",
       "condition": "",
       "note": ""
