@@ -1,7 +1,28 @@
 {
-  "version": 3,
-  "updatedAt": null,
-  "geckos": [],
+  "version": 6,
+  "updatedAt": "2026-09-13T14:58:37.797Z",
+  "geckos": [
+    {
+      "id": "mtzxvm1y-xkhj3s",
+      "name": "아잔틱",
+      "morph": "릴리아잔틱",
+      "sex": "unknown",
+      "hatchDate": "2025-04-26",
+      "acquiredDate": "2026-08-09",
+      "breeder": "아스트로",
+      "notes": "",
+      "parent1Id": "",
+      "parent2Id": "",
+      "breederNotation": "",
+      "customTraits": [],
+      "genetics": {
+        "lilly": "lilly",
+        "axanthic": "visual",
+        "cappuccino": "unknown",
+        "solidBack": "unknown"
+      }
+    }
+  ],
   "growth": [],
   "pairings": []
 }
