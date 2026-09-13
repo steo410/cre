@@ -1,6 +1,6 @@
 {
   "version": 6,
-  "updatedAt": "2026-09-13T14:58:37.797Z",
+  "updatedAt": "2026-09-13T15:00:21.501Z",
   "geckos": [
     {
       "id": "mtzxvm1y-xkhj3s",
@@ -18,6 +18,26 @@
       "genetics": {
         "lilly": "lilly",
         "axanthic": "visual",
+        "cappuccino": "unknown",
+        "solidBack": "unknown"
+      }
+    },
+    {
+      "id": "mtzxxib8-ysq8gv",
+      "name": "커드",
+      "morph": "노멀",
+      "sex": "unknown",
+      "hatchDate": "2026-05-11",
+      "acquiredDate": "2026-08-09",
+      "breeder": "아스트로",
+      "notes": "",
+      "parent1Id": "",
+      "parent2Id": "",
+      "breederNotation": "",
+      "customTraits": [],
+      "genetics": {
+        "lilly": "unknown",
+        "axanthic": "unknown",
         "cappuccino": "unknown",
         "solidBack": "unknown"
       }
