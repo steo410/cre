@@ -1,6 +1,6 @@
 {
   "version": 6,
-  "updatedAt": "2026-09-13T15:07:35.630Z",
+  "updatedAt": "2026-09-13T15:07:57.393Z",
   "geckos": [
     {
       "id": "mtzxvm1y-xkhj3s",
@@ -86,7 +86,9 @@
         "axanthic": "unknown",
         "cappuccino": "unknown",
         "solidBack": "unknown"
-      }
+      },
+      "photoUrl": "https://raw.githubusercontent.com/steo410/cre/crestie-data/data/photos/mtzxzadn-a1t3x1/d30c407a-4f24-4f2e-aec5-c51401b48a6e.webp",
+      "photoPath": "data/photos/mtzxzadn-a1t3x1/d30c407a-4f24-4f2e-aec5-c51401b48a6e.webp"
     },
     {
       "id": "mtzy04gn-e5uvmz",
