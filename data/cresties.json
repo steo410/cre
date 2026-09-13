@@ -1,6 +1,6 @@
 {
   "version": 6,
-  "updatedAt": "2026-09-13T15:00:40.370Z",
+  "updatedAt": "2026-09-13T15:02:29.052Z",
   "geckos": [
     {
       "id": "mtzxvm1y-xkhj3s",
@@ -61,8 +61,58 @@
         "cappuccino": "unknown",
         "solidBack": "present"
       }
+    },
+    {
+      "id": "mtzxzadn-a1t3x1",
+      "name": "릴리",
+      "morph": "릴리화이트",
+      "sex": "male",
+      "hatchDate": "",
+      "acquiredDate": "2026-08-30",
+      "breeder": "일광",
+      "notes": "",
+      "parent1Id": "",
+      "parent2Id": "",
+      "breederNotation": "",
+      "customTraits": [],
+      "genetics": {
+        "lilly": "lilly",
+        "axanthic": "unknown",
+        "cappuccino": "unknown",
+        "solidBack": "unknown"
+      }
+    },
+    {
+      "id": "mtzy04gn-e5uvmz",
+      "name": "달마",
+      "morph": "릴리화이트",
+      "sex": "unknown",
+      "hatchDate": "",
+      "acquiredDate": "2026-09-06",
+      "breeder": "양산",
+      "notes": "",
+      "parent1Id": "",
+      "parent2Id": "",
+      "breederNotation": "",
+      "customTraits": [],
+      "genetics": {
+        "lilly": "lilly",
+        "axanthic": "unknown",
+        "cappuccino": "unknown",
+        "solidBack": "unknown"
+      }
     }
   ],
-  "growth": [],
+  "growth": [
+    {
+      "id": "mtzy0j1a-uv1vuz",
+      "geckoId": "mtzxvm1y-xkhj3s",
+      "date": "2026-08-30",
+      "weight": 1.8,
+      "length": "",
+      "condition": "",
+      "note": ""
+    }
+  ],
   "pairings": []
 }
