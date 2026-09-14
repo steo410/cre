@@ -1,6 +1,6 @@
 {
   "version": 6,
-  "updatedAt": "2026-09-14T00:13:19.618Z",
+  "updatedAt": "2026-09-14T00:13:53.628Z",
   "geckos": [
     {
       "id": "mtzxvm1y-xkhj3s",
@@ -111,26 +111,6 @@
       },
       "photoUrl": "https://raw.githubusercontent.com/steo410/cre/crestie-data/data/photos/mtzy04gn-e5uvmz/e2d81a1c-9eeb-4f07-a26c-8c7156a721da.webp",
       "photoPath": "data/photos/mtzy04gn-e5uvmz/e2d81a1c-9eeb-4f07-a26c-8c7156a721da.webp"
-    },
-    {
-      "id": "mtqsmn7v-8oku0m",
-      "name": "아잔틱",
-      "morph": "릴리아잔틱",
-      "sex": "unknown",
-      "hatchDate": "",
-      "acquiredDate": "2026-08-09",
-      "breeder": "아스트로",
-      "notes": "",
-      "parent1Id": "",
-      "parent2Id": "",
-      "breederNotation": "",
-      "customTraits": [],
-      "genetics": {
-        "lilly": "lilly",
-        "axanthic": "visual",
-        "cappuccino": "unknown",
-        "solidBack": "unknown"
-      }
     }
   ],
   "growth": [
