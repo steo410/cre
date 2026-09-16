@@ -1,13 +1,15 @@
 {
-  "version": 6,
-  "updatedAt": "2026-09-13T14:45:52.007Z",
+  "version": 7,
+  "updatedAt": "2026-09-16T11:01:34.133Z",
   "geckos": [
     {
       "id": "connection-check",
       "name": "Storage connection test",
-      "checkedAt": "2026-09-13T14:45:52.007Z"
+      "checkedAt": "2026-09-16T11:01:34.132Z"
     }
   ],
   "growth": [],
-  "pairings": []
+  "pairings": [],
+  "photos": [],
+  "ledger": []
 }
