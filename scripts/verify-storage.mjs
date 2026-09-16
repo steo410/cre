@@ -26,7 +26,7 @@ try {
   const before = await call('GET');
   if (!before.canWrite) throw new Error('PASSWORD_CHECK_FAILED');
   const stamp = new Date().toISOString();
-  const saved = await call('POST', { baseRevision: before.revision, geckos: [{ id: 'connection-check', name: 'Storage connection test', checkedAt: stamp }], growth: [], pairings: [] });
+  const saved = await call('POST', { baseRevision: before.revision, geckos: [{ id: 'connection-check', name: 'Storage connection test', checkedAt: stamp }], growth: [], pairings: [], photos: [], ledger: [] });
   const after = await call('GET');
   if (saved.revision !== after.revision || after.geckos[0]?.checkedAt !== stamp) throw new Error('STORAGE_READBACK_FAILED');
   console.log('PASS: production password, GitHub write, and independent read-back.');

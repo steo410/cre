@@ -5,7 +5,7 @@ import handler from '../api/data.js';
 import photo from '../api/photo.js';
 import { readJson } from '../lib/github-store.js';
 
-const doc = () => ({ geckos: [{ id: 'a', name: '테스트' }], growth: [], pairings: [] });
+const doc = () => ({ geckos: [{ id: 'a', name: '테스트' }], growth: [], pairings: [], photos: [], ledger: [] });
 const hash = text => createHash('sha1').update(text).digest('hex');
 function setup(t) {
   process.env.CRESTIE_GITHUB_TOKEN = 'test-only-token';
@@ -55,6 +55,16 @@ test('stale device cannot overwrite newer records', async t => {
   assert.equal((await s.call('POST', { ...doc(), baseRevision: before.body.revision })).code, 200);
   assert.equal((await s.call('POST', { ...doc(), baseRevision: before.body.revision })).code, 409);
   assert.equal(s.writes.length, 1);
+});
+test('new fields roundtrip and old tabs cannot erase them', async t => {
+  const s = setup(t), before = await s.call('GET');
+  const next = { ...doc(), baseRevision: before.body.revision, photos: [{ id: 'p1', geckoId: 'a', url: 'https://example.com/a.webp' }], ledger: [{ id: 'l1', date: '2026-09-16', direction: 'expense', amount: 32000, item: '사육장' }] };
+  assert.equal((await s.call('POST', next)).code, 200);
+  const after = await s.call('GET');
+  assert.equal(after.body.photos[0].id, 'p1'); assert.equal(after.body.ledger[0].amount, 32000);
+  const legacy = { geckos: [], growth: [], pairings: [], baseRevision: after.body.revision };
+  assert.equal((await s.call('POST', legacy)).code, 428);
+  assert.equal((await s.call('GET')).body.ledger.length, 1);
 });
 test('missing password and malformed records never reach GitHub writes', async t => {
   const s = setup(t);

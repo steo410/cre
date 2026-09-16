@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import '../sync-core.js';
 
 const { merge, empty } = globalThis.CrestieSync;
-const doc = (geckos = [], growth = [], pairings = []) => ({ geckos, growth, pairings });
+const doc = (geckos = [], growth = [], pairings = []) => ({ geckos, growth, pairings, photos: [], ledger: [] });
 test('independent additions from laptop and phone survive', () => {
   const out = merge(empty(), doc([{ id: 'a' }]), doc([{ id: 'b' }]));
   assert.deepEqual(out.conflicts, []);

@@ -1,8 +1,8 @@
 /* Three-way merge. Missing records represent deletions. */
 (() => {
-  const groups = ['geckos', 'growth', 'pairings'];
+  const groups = ['geckos', 'growth', 'pairings', 'photos', 'ledger'];
   const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  const empty = () => ({ geckos: [], growth: [], pairings: [] });
+  const empty = () => ({ geckos: [], growth: [], pairings: [], photos: [], ledger: [] });
   const data = value => Object.fromEntries(groups.map(k => [k, value[k] || []]));
   function merge(base, local, remote) {
     const conflicts = [];
