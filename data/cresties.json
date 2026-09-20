@@ -1,6 +1,6 @@
 {
   "version": 7,
-  "updatedAt": "2026-09-20T14:56:21.871Z",
+  "updatedAt": "2026-09-20T14:58:01.667Z",
   "geckos": [
     {
       "id": "mtzxvm1y-xkhj3s",
@@ -285,6 +285,13 @@
       "url": "https://raw.githubusercontent.com/steo410/cre/crestie-data/data/photos/mu9xg9zu-gpyz6t/1a26cfb7-6cc8-430a-bdba-d311ad73a137.webp",
       "path": "data/photos/mu9xg9zu-gpyz6t/1a26cfb7-6cc8-430a-bdba-d311ad73a137.webp",
       "addedAt": "2026-09-20T14:44:27.350Z"
+    },
+    {
+      "id": "mu9xxtgn-o462mr",
+      "geckoId": "mtzxvm1y-xkhj3s",
+      "url": "https://raw.githubusercontent.com/steo410/cre/crestie-data/data/photos/mtzxvm1y-xkhj3s/fcd3c04a-c5e7-43a6-9fb5-4e6031c99a88.webp",
+      "path": "data/photos/mtzxvm1y-xkhj3s/fcd3c04a-c5e7-43a6-9fb5-4e6031c99a88.webp",
+      "addedAt": "2026-09-20T14:58:00.935Z"
     }
   ],
   "ledger": []
