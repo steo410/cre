@@ -1,6 +1,6 @@
 {
-  "version": 6,
-  "updatedAt": "2026-09-14T00:13:53.628Z",
+  "version": 7,
+  "updatedAt": "2026-09-20T14:44:47.709Z",
   "geckos": [
     {
       "id": "mtzxvm1y-xkhj3s",
@@ -111,6 +111,26 @@
       },
       "photoUrl": "https://raw.githubusercontent.com/steo410/cre/crestie-data/data/photos/mtzy04gn-e5uvmz/e2d81a1c-9eeb-4f07-a26c-8c7156a721da.webp",
       "photoPath": "data/photos/mtzy04gn-e5uvmz/e2d81a1c-9eeb-4f07-a26c-8c7156a721da.webp"
+    },
+    {
+      "id": "mu9xg9zu-gpyz6t",
+      "name": "타이거",
+      "morph": "트익할",
+      "sex": "male",
+      "hatchDate": "2024-12-01",
+      "acquiredDate": "2026-09-19",
+      "breeder": "당근(명지)",
+      "notes": "",
+      "parent1Id": "",
+      "parent2Id": "",
+      "breederNotation": "",
+      "customTraits": [],
+      "genetics": {
+        "lilly": "unknown",
+        "axanthic": "unknown",
+        "cappuccino": "unknown",
+        "solidBack": "unknown"
+      }
     }
   ],
   "growth": [
@@ -214,5 +234,22 @@
       "note": ""
     }
   ],
-  "pairings": []
+  "pairings": [],
+  "photos": [
+    {
+      "id": "mu9xgc1o-akku9r",
+      "geckoId": "mu9xg9zu-gpyz6t",
+      "url": "https://raw.githubusercontent.com/steo410/cre/crestie-data/data/photos/mu9xg9zu-gpyz6t/64f4e342-a6d1-4bbb-a74e-7d2a795cd36e.webp",
+      "path": "data/photos/mu9xg9zu-gpyz6t/64f4e342-a6d1-4bbb-a74e-7d2a795cd36e.webp",
+      "addedAt": "2026-09-20T14:44:25.212Z"
+    },
+    {
+      "id": "mu9xgdp2-6hbqda",
+      "geckoId": "mu9xg9zu-gpyz6t",
+      "url": "https://raw.githubusercontent.com/steo410/cre/crestie-data/data/photos/mu9xg9zu-gpyz6t/1a26cfb7-6cc8-430a-bdba-d311ad73a137.webp",
+      "path": "data/photos/mu9xg9zu-gpyz6t/1a26cfb7-6cc8-430a-bdba-d311ad73a137.webp",
+      "addedAt": "2026-09-20T14:44:27.350Z"
+    }
+  ],
+  "ledger": []
 }
