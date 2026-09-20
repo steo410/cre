@@ -1,6 +1,6 @@
 {
   "version": 7,
-  "updatedAt": "2026-09-20T15:07:40.486Z",
+  "updatedAt": "2026-09-20T15:20:55.589Z",
   "geckos": [
     {
       "id": "mtzxvm1y-xkhj3s",
@@ -129,6 +129,26 @@
         "lilly": "unknown",
         "axanthic": "unknown",
         "cappuccino": "unknown",
+        "solidBack": "unknown"
+      }
+    },
+    {
+      "id": "mu9yr535-yvfyj5",
+      "name": "카푸",
+      "morph": "카푸치노",
+      "sex": "female",
+      "hatchDate": "2025-09-01",
+      "acquiredDate": "2026-09-20",
+      "breeder": "당근(명지)",
+      "notes": "",
+      "parent1Id": "",
+      "parent2Id": "",
+      "breederNotation": "",
+      "customTraits": [],
+      "genetics": {
+        "lilly": "unknown",
+        "axanthic": "unknown",
+        "cappuccino": "cappuccino",
         "solidBack": "unknown"
       }
     }
@@ -308,6 +328,20 @@
       "url": "https://raw.githubusercontent.com/steo410/cre/crestie-data/data/photos/mtzy04gn-e5uvmz/9e26f8a5-5a6d-48d5-9e42-7ceb61bfd514.webp",
       "path": "data/photos/mtzy04gn-e5uvmz/9e26f8a5-5a6d-48d5-9e42-7ceb61bfd514.webp",
       "addedAt": "2026-09-20T15:07:39.790Z"
+    },
+    {
+      "id": "mu9yr750-f8k1fy",
+      "geckoId": "mu9yr535-yvfyj5",
+      "url": "https://raw.githubusercontent.com/steo410/cre/crestie-data/data/photos/mu9yr535-yvfyj5/e2989e66-1779-4d4d-b5c9-1567a418ffae.webp",
+      "path": "data/photos/mu9yr535-yvfyj5/e2989e66-1779-4d4d-b5c9-1567a418ffae.webp",
+      "addedAt": "2026-09-20T15:20:51.684Z"
+    },
+    {
+      "id": "mu9yr9hn-aam3rt",
+      "geckoId": "mu9yr535-yvfyj5",
+      "url": "https://raw.githubusercontent.com/steo410/cre/crestie-data/data/photos/mu9yr535-yvfyj5/e574a18e-dd8a-486c-a0a0-190073753483.webp",
+      "path": "data/photos/mu9yr535-yvfyj5/e574a18e-dd8a-486c-a0a0-190073753483.webp",
+      "addedAt": "2026-09-20T15:20:54.731Z"
     }
   ],
   "ledger": []
