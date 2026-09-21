@@ -1,6 +1,6 @@
 {
   "version": 7,
-  "updatedAt": "2026-09-21T02:51:59.836Z",
+  "updatedAt": "2026-09-21T02:52:11.551Z",
   "geckos": [
     {
       "id": "mtzxvm1y-xkhj3s",
@@ -80,9 +80,7 @@
       "parent1Id": "",
       "parent2Id": "",
       "breederNotation": "",
-      "customTraits": [
-        "릴리화이트"
-      ],
+      "customTraits": [],
       "genetics": {
         "lilly": "lilly",
         "axanthic": "unknown",
