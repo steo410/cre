@@ -1,6 +1,6 @@
 {
   "version": 7,
-  "updatedAt": "2026-09-20T15:21:09.092Z",
+  "updatedAt": "2026-09-21T02:51:59.836Z",
   "geckos": [
     {
       "id": "mtzxvm1y-xkhj3s",
@@ -75,12 +75,14 @@
       "sex": "male",
       "hatchDate": "",
       "acquiredDate": "2026-08-30",
-      "breeder": "일광",
+      "breeder": "당근(일광)",
       "notes": "",
       "parent1Id": "",
       "parent2Id": "",
       "breederNotation": "",
-      "customTraits": [],
+      "customTraits": [
+        "릴리화이트"
+      ],
       "genetics": {
         "lilly": "lilly",
         "axanthic": "unknown",
